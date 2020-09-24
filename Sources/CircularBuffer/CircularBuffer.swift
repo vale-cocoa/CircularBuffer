@@ -137,13 +137,7 @@ public final class CircularBuffer<Element> {
     }
     
     deinit {
-        if _head + _elementsCount > _capacity {
-            let rightCount = _capacity - _head
-            _elements.advanced(by: _head).deinitialize(count: rightCount)
-            _elements.deinitialize(count: _elementsCount - rightCount)
-        } else {
-            _elements.advanced(by: _head).deinitialize(count: _elementsCount)
-        }
+        _deinitializeElements(advancedToBufferIndex: _head, count: _elementsCount)
         _elements.deallocate()
     }
     
@@ -223,13 +217,7 @@ public final class CircularBuffer<Element> {
         let newCapacity = additionalCapacity > 0 ? Self._normalized(capacity: _capacity + additionalCapacity) : _capacity
         let copy = CircularBuffer(capacity: newCapacity)
         if !isEmpty {
-            if _head + _elementsCount > _capacity {
-                let rightCount = _capacity - _head
-                copy._elements.initialize(from: _elements.advanced(by: _head), count: rightCount)
-                copy._elements.advanced(by: rightCount).initialize(from: _elements, count: _elementsCount - rightCount)
-            } else {
-                copy._elements.initialize(from: _elements, count: _elementsCount)
-            }
+            _initializeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: copy._elements)
         }
         
         copy._elementsCount = _elementsCount
@@ -329,6 +317,7 @@ public final class CircularBuffer<Element> {
             push(nextNewElement)
         }
     }
+    
     /// Stores the given collection of elements at first position of the storage, mainteining their order.
     ///
     /// ```
@@ -697,6 +686,7 @@ public final class CircularBuffer<Element> {
                     // then back in _elements at the index where the removal started,
                     // obtaining also the buffer index for recalculating the _tail:
                     lastBufIdx = _moveInitializeToElements(advancedToBufferIndex: buffIdx, from: swap, count: countOfElementsToShift)
+                    swap.deallocate()
                 } else {
                     // The removal ended up to the last element, hence the buffer index
                     // for calculating the new _tail is the one obtained from the removal.
@@ -821,6 +811,7 @@ public final class CircularBuffer<Element> {
                         // Let's now put back th eelements that were shifted, obtaining
                         // the bufferIndex for calculating the new _tail:
                         lastBuffIdx = _moveInitializeToElements(advancedToBufferIndex: newBuffIdxForShifted, from: swap, count: countOfElementsToShift)
+                        swap.deallocate()
                     } else {
                         // The operation doesn't involve any element to be shifted,
                         // thus let's just put in place newElements obtainig the buffer
@@ -1015,12 +1006,29 @@ extension CircularBuffer {
     fileprivate func _moveInitialzeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > _capacity {
-            let rightCount = _capacity - startIdx
-            destination.moveInitialize(from: _elements.advanced(by: startIdx), count: rightCount)
-            destination.advanced(by: rightCount).moveInitialize(from: _elements, count: k - rightCount)
-            nextBufferIdx = k - rightCount
+            let segmentCount = _capacity - startIdx
+            destination.moveInitialize(from: _elements.advanced(by: startIdx), count: segmentCount)
+            destination.advanced(by: segmentCount).moveInitialize(from: _elements, count: k - segmentCount)
+            nextBufferIdx = k - segmentCount
         } else {
             destination.moveInitialize(from: _elements.advanced(by: startIdx), count: k)
+            nextBufferIdx = startIdx + k
+        }
+        
+        return nextBufferIdx == _capacity ? 0 : nextBufferIdx
+    }
+    
+    @inline(__always)
+    @discardableResult
+    fileprivate func _initializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+        let nextBufferIdx: Int!
+        if startIdx + k > _capacity {
+            let segmentCount = _capacity - startIdx
+            destination.initialize(from: _elements.advanced(by: startIdx), count: segmentCount)
+            destination.advanced(by: segmentCount).initialize(from: _elements, count: k - segmentCount)
+            nextBufferIdx = k - segmentCount
+        } else {
+            destination.initialize(from: _elements.advanced(by: startIdx), count: k)
             nextBufferIdx = startIdx + k
         }
         
@@ -1032,12 +1040,12 @@ extension CircularBuffer {
     fileprivate func _initializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
         let nextBufferIdx: Int
         if startIdx + newElements.count > _capacity {
-            let rightCount = _capacity - startIdx
-            let firstSplitRange = newElements.startIndex..<newElements.index(newElements.startIndex, offsetBy: rightCount)
-            let secondSplitRange = newElements.index(newElements.startIndex, offsetBy: rightCount)..<newElements.endIndex
+            let segmentCount = _capacity - startIdx
+            let firstSplitRange = newElements.startIndex..<newElements.index(newElements.startIndex, offsetBy: segmentCount)
+            let secondSplitRange = newElements.index(newElements.startIndex, offsetBy: segmentCount)..<newElements.endIndex
             _elements.advanced(by: startIdx).initialize(from: newElements[firstSplitRange])
             _elements.initialize(from: newElements[secondSplitRange])
-            nextBufferIdx = newElements.count - rightCount
+            nextBufferIdx = newElements.count - segmentCount
         } else {
             _elements.advanced(by: startIdx).initialize(from: newElements)
             nextBufferIdx = startIdx + newElements.count
@@ -1051,10 +1059,10 @@ extension CircularBuffer {
     func _moveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
         let nextBuffIdx: Int!
         if startIdx + k > _capacity {
-            let rightCount = _capacity - startIdx
-            _elements.advanced(by: startIdx).moveInitialize(from: other, count: rightCount)
-            _elements.moveInitialize(from: other.advanced(by: rightCount), count: k - rightCount)
-            nextBuffIdx = k - rightCount
+            let segmentCount = _capacity - startIdx
+            _elements.advanced(by: startIdx).moveInitialize(from: other, count: segmentCount)
+            _elements.moveInitialize(from: other.advanced(by: segmentCount), count: k - segmentCount)
+            nextBuffIdx = k - segmentCount
         } else {
             _elements.advanced(by: startIdx).moveInitialize(from: other, count: k)
             nextBuffIdx = startIdx + k
@@ -1068,10 +1076,10 @@ extension CircularBuffer {
     func _deinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
         let nextBufferIdx: Int!
         if startIdx + count > _capacity {
-            let rightCount = _capacity - startIdx
-            _elements.advanced(by: startIdx).deinitialize(count: rightCount)
-            _elements.deinitialize(count: count - rightCount)
-            nextBufferIdx = count - rightCount
+            let segmentCount = _capacity - startIdx
+            _elements.advanced(by: startIdx).deinitialize(count: segmentCount)
+            _elements.deinitialize(count: count - segmentCount)
+            nextBufferIdx = count - segmentCount
         } else {
             _elements.advanced(by: startIdx).deinitialize(count: count)
             nextBufferIdx = startIdx + count
