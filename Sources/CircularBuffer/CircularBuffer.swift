@@ -87,19 +87,83 @@ public final class CircularBuffer<Element> {
         self._head = 0
     }
     
+    /// Returns a new `CircularBuffer` instance initialized to contain the same elements of the given sequence,
+    /// in the same order.
+    ///
+    /// - Parameter elements: a sequence of elements to store.
+    /// - Complexity: O(1) when given sequence implements `withContiguousStorageIfAvailable(_:)`
+    /// method, otherwise O(k) where *k* is the count of elements of the given sequence.
+    /// - Note: when given an empty sequence, it returns an empty instance.
+    public init<S: Sequence>(elements: S) where Element == S.Iterator.Element {
+        var capacity: Int!
+        var buffer: UnsafeMutablePointer<Element>!
+        var count: Int!
+        
+        var done: Bool = false
+        elements.withContiguousStorageIfAvailable { elementsBuffer in
+            guard elementsBuffer.baseAddress != nil else { return }
+            
+            capacity = Self._normalized(capacity: elementsBuffer.count)
+            buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+            count = elementsBuffer.count
+            if elementsBuffer.count > 0 {
+                buffer.initialize(from: elementsBuffer.baseAddress!, count: count)
+            }
+            
+            done = true
+        }
+        
+        if !done {
+            let sequenceCount = elements.underestimatedCount
+            var sequenceIterator = elements.makeIterator()
+            guard
+                let firstElement = sequenceIterator.next()
+            else {
+                self._capacity = Self._minCapacity
+                self._elementsCount = 0
+                self._elements = UnsafeMutablePointer<Element>.allocate(capacity: Self._minCapacity)
+                self._head = 0
+                self._tail = 0
+                
+                return
+            }
+            
+            capacity = Self._normalized(capacity: sequenceCount)
+            count = 1
+            buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+            buffer.initialize(to: firstElement)
+            while let nextElement = sequenceIterator.next() {
+                if count + 1 >= capacity {
+                    capacity = Self._normalized(capacity: count + 1)
+                    let swap = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+                    swap.moveInitialize(from: buffer, count: count)
+                    buffer.deallocate()
+                    buffer = swap
+                }
+                buffer.advanced(by: count).initialize(to: nextElement)
+                count += 1
+            }
+        }
+        
+        self._elements = buffer
+        self._capacity = capacity
+        self._elementsCount = count
+        self._head = 0
+        self._tail = count == capacity ? 0 : count
+    }
+    
     /// Returns a new `CircularBuffer` instance initialized to contain the same elements of the given collection,
     /// in the same order.
     ///
     /// - Parameter elements: a collection of elements to store.
+    /// - Complexity: O(1) when given collection implements `withContiguousStorageIfAvailable(_:)`
+    /// method, otherwise O(k) where *k* is the count of elements of the given collection.
     /// - Note: when given an empty collection, it returns an empty instance.
     public init<C: Collection>(elements: C) where C.Iterator.Element == Element {
         let elementsCount = elements.count
         let nCapacity = Self._normalized(capacity: elementsCount)
         self._elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
-        for idx in 0..<elementsCount {
-            let eIdx = elements.index(elements.startIndex, offsetBy: idx)
-            self._elements.advanced(by: idx).initialize(to: elements[eIdx])
-        }
+        self._elements.initialize(from: elements)
         self._capacity = nCapacity
         self._elementsCount = elementsCount
         self._tail = elementsCount == nCapacity ? 0 : elementsCount
