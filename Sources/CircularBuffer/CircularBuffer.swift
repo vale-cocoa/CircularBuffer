@@ -2,7 +2,7 @@
 // CircularBuffer.swift
 // CircularBuffer
 //
-//  Created by Valeriano Della Longa on 2020/09/01.
+//  Created by Valeriano Della Longa on 2020/09/24.
 //  Copyright © 2020 Valeriano Della Longa. All rights reserved.
 //
 //  Permission to use, copy, modify, and/or distribute this software for any
@@ -17,16 +17,17 @@
 //  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 //  IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
-/// A memory buffer providing amortized O(1) performance for operations on its position at both ends.
+/// A memory buffer providing amortized O(1) performance for operations on its stored elements at both start and end
+/// positions.
 ///
-/// This reference type can suit as the underlaying buffer of Collection value types needing to perform better than other buffer
-///  types that won't guarantee such performance of O(1) for operations of insertion and removal on the first and last
-///   elements.
-/// For example Array performs in O(1) on operations involving removal/insertion of its last element, but only O(n) on its first
-///  element (where n is the number of elements successive the first one).
-/// That's due to the fact that `Array` has to shift elements successive its first one in order to keep its indexing intact.
-/// On the other hand, CircularBuffer uses a clever *head* and *tail* internal indexes system which makes possible not to
-///  shift elements when removing/inserting at the first and last indexes.
+/// This reference type can suit as the underlaying buffer of `MutableCollection` value types needing to perform better
+/// than other buffer types that won't guarantee such performance of O(1) for operations of insertion and removal on the first
+/// and last elements.
+/// For example `Array` performs in O(1) on operations involving removal/insertion of its last element, but only O(n) on its
+/// first element (where n is the number of elements successive the first one).
+/// That's due to the fact that `Array` has to shift elements successive its first one in order to keep its indexing order intact.
+/// On the other hand, `CircularBuffer` uses a clever *head* and *tail* internal indexes system which makes possible
+/// not to shift elements when removing/inserting at the first and last indexes.
 public final class CircularBuffer<Element> {
     private(set) var _elements: UnsafeMutablePointer<Element>
     
@@ -38,38 +39,7 @@ public final class CircularBuffer<Element> {
     
     private(set) var _elementsCount: Int
     
-    /// Flags if all the capacity is taken.
-    public var isFull: Bool {
-        _elementsCount == _capacity
-    }
     
-    /// Flags if there aren't elements stored.
-    public var isEmpty: Bool {
-        _elementsCount == 0
-    }
-    
-    /// The number of stored elements
-    public var count: Int {
-        _elementsCount
-    }
-    
-    /// The element stored at first position.
-    ///
-    /// - Note: equals `last` when there is just one element stored, `nil` when `isEmpty` is `true`
-    public var first: Element? {
-        guard !isEmpty else { return nil }
-        
-        return _elements.advanced(by: _head).pointee
-    }
-    
-    /// The element stored at last position.
-    ///
-    /// - Note: equals `first` when there is just one elment stored, `nil` when `isEmpty` is `true`
-    public var last: Element? {
-        guard !isEmpty else { return nil }
-        
-        return _elements.advanced(by: decrementIndex(_tail)).pointee
-    }
     
     // MARK: - Initializing and deinitializing
     /// Returns a new empty `CircularBuffer` instance, with its capacity set to the minimum value.
@@ -141,6 +111,112 @@ public final class CircularBuffer<Element> {
         _elements.deallocate()
     }
     
+}
+
+// MARK: - Public Interface
+// MARK: - Computed properties
+extension CircularBuffer {
+    /// Flags if all the capacity is taken.
+    public var isFull: Bool {
+        _elementsCount == _capacity
+    }
+    
+    /// Flags if there aren't elements stored.
+    public var isEmpty: Bool {
+        _elementsCount == 0
+    }
+    
+    /// The number of stored elements
+    public var count: Int {
+        _elementsCount
+    }
+    
+    /// The element stored at first position.
+    ///
+    /// - Note: equals `last` when there is just one element stored, `nil` when `isEmpty` is `true`
+    public var first: Element? {
+        guard !isEmpty else { return nil }
+        
+        return _elements.advanced(by: _head).pointee
+    }
+    
+    /// The element stored at last position.
+    ///
+    /// - Note: equals `first` when there is just one elment stored, `nil` when `isEmpty` is `true`
+    public var last: Element? {
+        guard !isEmpty else { return nil }
+        
+        return _elements.advanced(by: decrementIndex(_tail)).pointee
+    }
+    
+    /// Get all stored elements as a mutable buffer pointer, pointing directly to the underlaying storage.
+    ///
+    /// Can be used to implement `withContiguousMutableStorageIfAvailable(_:)` in a
+    /// `MutableCollection` which uses `CircularBuffer` as its underlaying storage.
+    /// Following example shows a potential way of implementing such method:
+    /// ```
+    /// mutating func withContiguousMutableStorageIfAvailable<R>(_ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R) rethrows -> R? {
+    ///     makeUnique()
+    ///     let originalCount = storage.count
+    ///     var inoutBufferPointer = storage.unsafeMutableBufferPointer
+    ///     let originalPointer = inoutBufferPointer.baseAddress
+    ///
+    ///     // Ensure that body can't invalidate the storage or its bounds by
+    ///     // moving self into a temporary working struct.
+    ///     var work = Self()
+    ///     (work, self) = (self, work)
+    ///
+    ///     // Put the working struct back before returning
+    ///     defer {
+    ///         precondition(
+    ///             inoutBufferPointer.baseAddress == originalPointer &&
+    ///             inoutBufferPointer.count == originalCount,
+    ///             "replacing the buffer is not allowed"
+    ///         )
+    ///         (work, self) = (self, work)
+    ///     }
+    ///
+    ///     return try body(&inoutBufferPointer)
+    /// }
+    /// ```
+    /// - Warning: When the instance gets mutated directly —affecting its count—, then a previously stored value of this
+    /// property will becomes invalid.
+    /// - Complexity: amortized O(1)
+    @inline(__always)
+    public var unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element> {
+        if _head + _elementsCount > _capacity {
+            _rotateBufferHeadToZero()
+        }
+            
+        return UnsafeMutableBufferPointer(start: _elements.advanced(by: _head), count: _elementsCount)
+    }
+    
+    /// Get all stored elements as a buffer pointer, pointing directly to the underlaying storage.
+    ///
+    /// Can be used to implement `withContiguousStorageIfAvailable(_:)` in a `Collection` which uses
+    /// `CircularBuffer` as its underlaying storage.
+    /// Following exampe shows a potential way of implementing such method:
+    /// ```
+    /// func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
+    ///     try body(storage.unsafeBufferPointer)
+    /// }
+    /// ```
+    /// - Warning: When the instance gets mutated directly —affecting its count—, then a previously stored value of this
+    /// property will becomes invalid.
+    /// - Complexity: amortized O(1)
+    @inline(__always)
+    public var unsafeBufferPointer: UnsafeBufferPointer<Element> {
+        if _head + _elementsCount > _capacity {
+            _rotateBufferHeadToZero()
+        }
+        
+        return UnsafeBufferPointer(start: _elements.advanced(by: _head), count: _elementsCount)
+    }
+    
+}
+
+// MARK: - Common operations
+extension CircularBuffer {
     // MARK: - Subscript
     /// Access stored element at specified position.
     ///
@@ -227,7 +303,11 @@ public final class CircularBuffer<Element> {
         return copy
     }
     
-    // MARK: - Add new elements
+}
+
+// MARK: - Add new elements
+extension CircularBuffer {
+    // MARK: - Appending
     /// Stores the given element, puttting it at the last position of the storage.
     ///
     /// - Parameter _: the element to store of type `Element`.
@@ -269,6 +349,38 @@ public final class CircularBuffer<Element> {
         }
     }
     
+    /// Stores the given collection of elements at last position of the storage, mainteining their order.
+    ///
+    /// ```
+    /// let newElements = [1, 2, 3]
+    /// let buffer = CircularBuffer<Int>()
+    /// buffer.push(4)
+    /// // buffer's storage: [4]
+    /// buffer.append(contentsOf: newElements)
+    /// // buffer's storage: [4, 1, 2, 3]
+    /// ```
+    /// - Parameter contentsOf: a collection of `Element` instances to store at the bottom of the storage.
+    /// - Complexity: amortized O(1) when given collection implements
+    /// `withContiguousStorageIfAvailable(body:)` method. Otherwise O(n),
+    /// where n is the number of elements stored in the collection.
+    @inline(__always)
+    public func append<C: Collection>(contentsOf newElements: C) where C.Iterator.Element == Element {
+        guard newElements.count > 0 else { return }
+        
+        if _elementsCount + newElements.count <= _capacity
+        {
+            // actual buffer can hold all elements, thus append newElements in place
+            let finalBufIdx = _initializeElements(advancedToBufferIndex: _tail, from: newElements)
+            _elementsCount += newElements.count
+            _tail = incrementIndex(finalBufIdx - 1)
+        } else {
+            // resize buffer to the right capacity and append newElements
+            let newCapacity = Self._normalized(capacity: _capacity + newElements.count)
+            _resizeElements(to: newCapacity, insert: newElements, at: _elementsCount)
+        }
+    }
+    
+    // MARK: - Prepending
     /// Stores given element at the topmost position of the storage.
     ///
     /// - Parameter _: the element to store of type `Element`.
@@ -337,7 +449,7 @@ public final class CircularBuffer<Element> {
         if _elementsCount + newElements.count <= _capacity
         {
             // actual buffer can hold all elements, thus prepend _newElements in place…
-            // Calculate the buffer index where newElements have to be appended from:
+            // Calculate the buffer index where newElements have to be appended:
             let newHead = _head - newElements.count < 0 ? _capacity - (newElements.count - _head) : _head - newElements.count
             // Copy newElements in place:
             _initializeElements(advancedToBufferIndex: newHead, from: newElements)
@@ -352,37 +464,7 @@ public final class CircularBuffer<Element> {
         }
     }
     
-    /// Stores the given collection of elements at last position of the storage, mainteining their order.
-    ///
-    /// ```
-    /// let newElements = [1, 2, 3]
-    /// let buffer = CircularBuffer<Int>()
-    /// buffer.push(4)
-    /// // buffer's storage: [4]
-    /// buffer.append(contentsOf: newElements)
-    /// // buffer's storage: [4, 1, 2, 3]
-    /// ```
-    /// - Parameter contentsOf: a collection of `Element` instances to store at the bottom of the storage.
-    /// - Complexity: amortized O(1) when given collection implements
-    /// `withContiguousStorageIfAvailable(body:)` method. Otherwise O(n),
-    /// where n is the number of elements stored in the collection.
-    @inline(__always)
-    public func append<C: Collection>(contentsOf newElements: C) where C.Iterator.Element == Element {
-        guard newElements.count > 0 else { return }
-        
-        if _elementsCount + newElements.count <= _capacity
-        {
-            // actual buffer can hold all elements, thus append newElements in place
-            let finalBufIdx = _initializeElements(advancedToBufferIndex: _tail, from: newElements)
-            _elementsCount += newElements.count
-            _tail = incrementIndex(finalBufIdx - 1)
-        } else {
-            // resize buffer to the right capacity and append newElements
-            let newCapacity = Self._normalized(capacity: _capacity + newElements.count)
-            _resizeElements(to: newCapacity, insert: newElements, at: _elementsCount)
-        }
-    }
-    
+    // MARK: - Inserting
     /// Insert all elements in given collection starting from given index., keeping their original order.
     ///
     /// ```
@@ -404,6 +486,7 @@ public final class CircularBuffer<Element> {
     public func insertAt<C: Collection>(index: Int, contentsOf newElements: C) where C.Iterator.Element == Element {
         precondition(index >= 0 && index <= _elementsCount)
         
+        // Check if it's a prepend operation:
         guard
             index != 0
         else {
@@ -412,6 +495,7 @@ public final class CircularBuffer<Element> {
             return
         }
         
+        // Otherwise could be an append operation:
         guard
             index != _elementsCount
         else {
@@ -420,6 +504,7 @@ public final class CircularBuffer<Element> {
             return
         }
         
+        // Check if there's elements to insert:
         guard
             !newElements.isEmpty
         else { return }
@@ -427,6 +512,7 @@ public final class CircularBuffer<Element> {
         if _elementsCount + newElements.count <= _capacity {
             // capacity is enough to hold addition, thus insert newElements in place
             let buffIdx = bufferIndex(from: index)
+            
             // Temporarly move out elements that has to be shifted:
             let elementsToShiftCount = _elementsCount - index
             let swap = UnsafeMutablePointer<Element>.allocate(capacity: elementsToShiftCount)
@@ -452,7 +538,10 @@ public final class CircularBuffer<Element> {
         }
     }
     
-    // MARK: - Remove elements
+}
+
+// MARK: - Remove elements
+extension CircularBuffer {
     /// Removes and returns –if present– the first element in the storage.
     ///
     /// - Returns: the first element of type `Element` of the storage; `nil` when `isEmpty` is `true`.
@@ -470,9 +559,25 @@ public final class CircularBuffer<Element> {
         return element
     }
     
+    /// Removes and returns –if present– the last element in the storage.
+    ///
+    /// - Returns: the flast element of type `Element` of the storage; `nil` when `isEmpty` is `true`.
+    /// - Complexity: O(1)
+    /// - Note: the capacity of the buffer is not affected by this operation.
+    @discardableResult
+    @inline(__always)
+    public func popLast() -> Element? {
+        guard !self.isEmpty else { return nil }
+        
+        _tail = decrementIndex(_tail)
+        let element = _elements.advanced(by: _tail).move()
+        _elementsCount -= 1
+        
+        return element
+    }
+    
     /// Removes and returns first *k* number of elements from the storage. Eventually reduces the buffer capacity when
     /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
-    /// **Callee must not be empty.**
     ///
     /// - Parameter _: an `Int` representing the *k* number of elements to remove from the top of the storage.
     /// Must be greater than or equal to `0`, and less than or equal `count` value.
@@ -480,6 +585,7 @@ public final class CircularBuffer<Element> {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
+    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -524,26 +630,8 @@ public final class CircularBuffer<Element> {
         return result
     }
     
-    /// Removes and returns –if present– the last element in the storage.
-    ///
-    /// - Returns: the flast element of type `Element` of the storage; `nil` when `isEmpty` is `true`.
-    /// - Complexity: O(1)
-    /// - Note: the capacity of the buffer is not affected by this operation.
-    @discardableResult
-    @inline(__always)
-    public func popLast() -> Element? {
-        guard !self.isEmpty else { return nil }
-        
-        _tail = decrementIndex(_tail)
-        let element = _elements.advanced(by: _tail).move()
-        _elementsCount -= 1
-        
-        return element
-    }
-    
     /// Removes and returns last *k* number of elements from the storage. Eventually reduces the buffer capacity when
     /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
-    /// **Callee must not be empty.**
     ///
     /// - Parameter _: an `Int` representing the *k* number of elements to remove from the bottom of the storage.
     /// Must be greater than or equal to `0`, and less than or equal `count` value.
@@ -551,6 +639,7 @@ public final class CircularBuffer<Element> {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
+    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -598,7 +687,6 @@ public final class CircularBuffer<Element> {
     /// Removes and returns *k* number of elements from the storage starting from the one at the given `index`
     /// parameter. Eventually reduces the buffer capacity when specified in the callee by giving a value of `true` as
     /// `keepCapacity` parameter value.
-    /// **Callee must not be empty.**
     ///
     /// - Parameter index: an `Int` representing the position where to start the removal. Must be a valid subscript
     /// index: hence greater than or equal `zero` and less than `count` when `isEmpty` is false.
@@ -610,6 +698,7 @@ public final class CircularBuffer<Element> {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
+    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -641,16 +730,22 @@ public final class CircularBuffer<Element> {
         // Get the real buffer index from given index:
         let buffIdx = bufferIndex(from: index)
         
-        // move elements to remove:
+        // move elements to remove, obtaining the buffer index from where some elements
+        // might remain:
         let bufIdxOfSecondSplit = _moveInitialzeFromElements(advancedToBufferIndex: buffIdx, count: k, to: removed)
         
-        // We'll shift inside the buffer —eventually resizing it— those elements below
-        // the ones just removed, and we defer it to after returning the removed ones.
+        // We defer the shifting of remaining elements/rejoining in a smaller buffer
+        // operation after we have returned the removed elements
         defer {
+            // Check if we ought move remaining elements to a smaller buffer, or if we
+            // ought shift them inside the actual buffer to occupy the space left by
+            //the removal:
             let newCapacity = keepCapacity ? _capacity : Self._normalized(capacity: _elementsCount - k)
             if newCapacity < _capacity {
-                // Let's move everything left to a smaller buffer:
+                // Let's move remaining elements to a smaller buffer…
                 let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
+                
+                // Remaining elements could be placed in two splits of current buffer:
                 let countOfFirstSplit = index
                 let countOfSecondSplit = _elementsCount - index - k
                 
@@ -674,12 +769,15 @@ public final class CircularBuffer<Element> {
                 _elementsCount -= k
                 _tail = incrementIndex(_elementsCount - 1)
             } else {
-                // We have to eventually shift elements in place:
+                // _capacity stays the same.
+                // We have to eventually shift up remaining elements placed after the
+                // removed ones:
                 let countOfElementsToShift = _elementsCount - index - k
                 let lastBufIdx: Int!
                 if countOfElementsToShift > 0 {
-                    // Some elemetns need to be shifted.
-                    // Let's first move them out _elements
+                    // There are some remaining elements in the buffer, occupying positions
+                    // below the removed ones.
+                    // Let's first move them out _elements:
                     let swap = UnsafeMutablePointer<Element>.allocate(capacity: countOfElementsToShift)
                     _moveInitialzeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfElementsToShift, to: swap)
                     
@@ -708,12 +806,12 @@ public final class CircularBuffer<Element> {
     
     /// Removes and returns all elements stored in the same order as they were in the storage. Eventually reduces the
     /// buffer capacity when specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
-    /// **Callee must not be empty.**
     ///
     /// - Parameter keepCapacity: a boolean flag; when set to true after the remove operation, attempts to reduce
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
+    /// - Warning: **Callee must not be empty.**
     @inline(__always)
     @discardableResult
     public func removeAll(keepCapacity: Bool = true) -> [Element] {
@@ -739,11 +837,14 @@ public final class CircularBuffer<Element> {
         return result
     }
     
-    // MARK: - Replace elements
+}
+
+// MARK: - Replace elements
+extension CircularBuffer {
     /// Replaces the elements stored at given range with the ones in the given collection.
-    /// Eventually reduces the capacity of the buffer after the replace operation have occured, in case the operation will
-    /// significally reduce the `count` value in respect to the current buffer capacity. Increases the buffer capacity when
-    /// the operation will result in a `count` value larger than actual buffer capacity.
+    /// Eventually reduces the capacity of the buffer after the replace operation have occured, in case it will significally
+    /// reduce the `count` value in respect to the current buffer capacity.
+    /// Increases the buffer capacity when the operation will result in a `count` value larger than actual buffer capacity.
     ///
     /// When given `subRange.count` equals `0` –i.e. `0..<0`–, the given elements are inserted at the index
     /// position represented by the `subRange.lowerBound` –i.e. for `0..<0` elements are prepended in the storage.
@@ -866,6 +967,7 @@ public final class CircularBuffer<Element> {
     
 }
 
+// MARK: - Private Interface
 // MARK: - Index helpers
 extension CircularBuffer {
     @inline(__always)
@@ -929,6 +1031,21 @@ extension CircularBuffer {
         if newCapacity < _capacity {
             _resizeElements(to: newCapacity)
         }
+    }
+    
+    @inline(__always)
+    private func _rotateBufferHeadToZero() {
+        guard _head != 0 else { return }
+        
+        if _elementsCount > 0 {
+            let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: _capacity)
+            _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: newBuff)
+            _elements.deallocate()
+            _elements = newBuff
+        }
+        
+        _head = 0
+        _tail = incrementIndex(_elementsCount - 1)
     }
     
     @inline(__always)
@@ -1003,7 +1120,7 @@ extension CircularBuffer {
 extension CircularBuffer {
     @inline(__always)
     @discardableResult
-    fileprivate func _moveInitialzeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    private func _moveInitialzeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > _capacity {
             let segmentCount = _capacity - startIdx
@@ -1020,7 +1137,7 @@ extension CircularBuffer {
     
     @inline(__always)
     @discardableResult
-    fileprivate func _initializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    private func _initializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > _capacity {
             let segmentCount = _capacity - startIdx
@@ -1037,7 +1154,7 @@ extension CircularBuffer {
     
     @inline(__always)
     @discardableResult
-    fileprivate func _initializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
+    private func _initializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
         let nextBufferIdx: Int
         if startIdx + newElements.count > _capacity {
             let segmentCount = _capacity - startIdx
@@ -1056,7 +1173,7 @@ extension CircularBuffer {
     
     @inline(__always)
     @discardableResult
-    func _moveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
+    private func _moveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
         let nextBuffIdx: Int!
         if startIdx + k > _capacity {
             let segmentCount = _capacity - startIdx
@@ -1073,7 +1190,7 @@ extension CircularBuffer {
     
     @inline(__always)
     @discardableResult
-    func _deinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
+    private func _deinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
         let nextBufferIdx: Int!
         if startIdx + count > _capacity {
             let segmentCount = _capacity - startIdx

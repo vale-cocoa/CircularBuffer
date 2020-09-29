@@ -977,6 +977,41 @@ final class CircularBufferTests: XCTestCase {
         }
     }
     
+    // MARK: - Unsafe(Mutable)BufferPointer tests
+    func test_unsafeMutableBufferPointer() {
+        var bufferPointer = sut.unsafeMutableBufferPointer
+        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
+        XCTAssertEqual(bufferPointer.count, sut.count)
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        
+        whenFull()
+        bufferPointer = sut.unsafeMutableBufferPointer
+        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
+        XCTAssertEqual(bufferPointer.count, sut.count)
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        
+        bufferPointer[2] += 10
+        XCTAssertEqual(bufferPointer[2], sut[2])
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        
+        sut[2] -= 10
+        XCTAssertEqual(bufferPointer[2], sut[2])
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+    }
+    
+    func test_unsafeBufferPointer() {
+        var bufferPointer = sut.unsafeBufferPointer
+        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
+        XCTAssertEqual(bufferPointer.count, sut.count)
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        
+        whenFull()
+        bufferPointer = sut.unsafeBufferPointer
+        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
+        XCTAssertEqual(bufferPointer.count, sut.count)
+        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+    }
+    
     // MARK: - performance tests
     func testCircularBufferPerformance() {
         measure(performanceLoopCircularBuffer)
