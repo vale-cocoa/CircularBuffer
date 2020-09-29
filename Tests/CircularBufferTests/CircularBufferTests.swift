@@ -90,6 +90,34 @@ final class CircularBufferTests: XCTestCase {
         }
     }
     
+    func testInitSequence() {
+        let emptySequence = AnySequence<Int>([])
+        sut = CircularBuffer(elements: emptySequence)
+        XCTAssertNotNil(sut)
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut._head, 0)
+        XCTAssertEqual(sut._tail, sut._elementsCount)
+        
+        let notEmptyWithoutContiguousBuffer = AnySequence([1, 2, 3, 4])
+        let implemented = notEmptyWithoutContiguousBuffer.withContiguousStorageIfAvailable { _ in
+            return true
+        }
+        XCTAssertNil(implemented)
+        
+        sut = CircularBuffer(elements: notEmptyWithoutContiguousBuffer)
+        XCTAssertNotNil(sut)
+        XCTAssertFalse(sut.isEmpty)
+        XCTAssertEqual(sut.count, 4)
+        XCTAssertEqual(sutContainedElements(), [1, 2, 3 ,4])
+        
+        let notEmptyWithContiguousBuffer = NotEmptySequenceWithContiguous()
+        sut = CircularBuffer(elements: notEmptyWithContiguousBuffer)
+        XCTAssertNotNil(sut)
+        XCTAssertFalse(sut.isEmpty)
+        XCTAssertEqual(sut.count, 4)
+        XCTAssertEqual(sutContainedElements(), notEmptyWithContiguousBuffer.content)
+    }
+    
     // MARK: - deinit() tests
     func test_deinit() {
         sut = nil
@@ -137,6 +165,51 @@ final class CircularBufferTests: XCTestCase {
         
         whenFull()
         XCTAssertEqual(sut.count, sut._elementsCount)
+    }
+    
+    // MARK: - allocateAdditionalCapacity(_:) tests
+    func testAllocateAdditionalCapacity_whenGivenZero_thenDoesNothing() {
+        let prevCapacity = sut._capacity
+        let prevBuffer = sut._elements
+        
+        sut.allocateAdditionalCapacity(0)
+        XCTAssertEqual(sut._capacity, prevCapacity)
+        XCTAssertEqual(sut._elements, prevBuffer)
+    }
+    
+    func testAllocateAdditionalCapacity_whenGivenMoreThanZeroAndActualCapacityIsEnough_thenDoesNothing() {
+        whenFull()
+        sut.append(5)
+        let prevCapacity = sut._capacity
+        let prevContainedElements = sutContainedElements()
+        let prevBuffer = sut._elements
+        
+        let residualEmptySpots = sut._capacity - sut._elementsCount
+        XCTAssertGreaterThan(residualEmptySpots, 0)
+        
+        sut.allocateAdditionalCapacity(residualEmptySpots)
+        XCTAssertEqual(sut._capacity, prevCapacity)
+        XCTAssertEqual(sut._elements, prevBuffer)
+        XCTAssertEqual(sutContainedElements(), prevContainedElements)
+    }
+    
+    func testAllocateAdditionalCapacity_whenGivenMoreThanZeroAndActualCapacityIsNotEnough_thenCapacityIncreasesAndBufferGetCopiedToALargerOne() {
+        whenFull()
+        let prevCapacity = sut._capacity
+        let prevContainedElements = sutContainedElements()
+        let prevBuffer = sut._elements
+        let prevFirst = sut.first
+        let prevLast = sut.last
+        
+        let residualEmptySpots = sut._capacity - sut._elementsCount
+        XCTAssertEqual(residualEmptySpots, 0)
+        
+        sut.allocateAdditionalCapacity(1)
+        XCTAssertGreaterThan(sut._capacity, prevCapacity)
+        XCTAssertEqual(sutContainedElements(), prevContainedElements)
+        XCTAssertNotEqual(sut._elements, prevBuffer)
+        XCTAssertEqual(sut.first, prevFirst)
+        XCTAssertEqual(sut.last, prevLast)
     }
     
     // MARK: - append(_:) tests
@@ -1089,6 +1162,34 @@ final class CircularBufferTests: XCTestCase {
             }
         }
         XCTAssert(accumulator == 0)
+    }
+    
+}
+
+fileprivate struct NotEmptySequenceWithContiguous: Sequence {
+    let content = [1, 2, 3, 4]
+    
+    var underestimatedCount: Int = 4
+    
+    typealias Element = Int
+    
+     typealias Iterator = AnyIterator<Int>
+    
+    func makeIterator() -> Iterator {
+        var idx = 0
+        
+        return AnyIterator<Int> {
+            guard idx < content.count else { return nil }
+            
+            defer { idx += 1 }
+            
+            return content[idx]
+        }
+    }
+    
+    func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Int>) throws -> R) rethrows -> R? {
+        
+        return try content.withContiguousStorageIfAvailable(body)
     }
     
 }
