@@ -245,6 +245,8 @@ final class CircularBufferTests: XCTestCase {
         let newElements1 = AnySequence<Int>(1...4)
         sut.append(contentsOf: newElements1)
         XCTAssertEqual(sut.count, 4)
+        XCTAssertEqual(sut.first, 1)
+        XCTAssertEqual(sut.last, 4)
         for i in 0..<4 {
             XCTAssertEqual(sut[i], i + 1)
         }
@@ -252,7 +254,36 @@ final class CircularBufferTests: XCTestCase {
         let newElements2 = AnySequence<Int>(5...8)
         sut.append(contentsOf: newElements2)
         XCTAssertEqual(sut.count, 8)
+        XCTAssertEqual(sut.first, 1)
+        XCTAssertEqual(sut.last, 8)
         for i in 0..<8 {
+            XCTAssertEqual(sut[i], i + 1)
+        }
+        
+        let newElements3 = SequenceImplementingWithContiguousStorage(base: [9, 10, 11, 12])
+        sut.append(contentsOf: newElements3)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 1)
+        XCTAssertEqual(sut.last, 12)
+        for i in 0..<12 {
+            XCTAssertEqual(sut[i], i + 1)
+        }
+        
+        let empty1 = AnySequence<Int>([])
+        sut.append(contentsOf: empty1)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 1)
+        XCTAssertEqual(sut.last, 12)
+        for i in 0..<12 {
+            XCTAssertEqual(sut[i], i + 1)
+        }
+        
+        let empty2 = SequenceImplementingWithContiguousStorage(base: [])
+        sut.append(contentsOf: empty2)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 1)
+        XCTAssertEqual(sut.last, 12)
+        for i in 0..<12 {
             XCTAssertEqual(sut[i], i + 1)
         }
     }
