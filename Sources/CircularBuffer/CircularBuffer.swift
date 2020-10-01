@@ -683,7 +683,6 @@ extension CircularBuffer {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
-    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -693,7 +692,6 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeFirst(_ k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(!self.isEmpty)
         precondition(k >= 0 && k <= _elementsCount)
         guard
             k < _elementsCount
@@ -737,7 +735,6 @@ extension CircularBuffer {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
-    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -747,7 +744,6 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeLast(_ k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(!self.isEmpty)
         precondition(k >= 0 && k <= _elementsCount)
         guard k < _elementsCount else { return removeAll(keepCapacity: keepCapacity) }
         
@@ -790,13 +786,11 @@ extension CircularBuffer {
     /// index: hence greater than or equal `zero` and less than `count` when `isEmpty` is false.
     /// - Parameter count: an `Int` representing the *k* number of elements to remove starting from the given
     ///  `index` position. Must be greater than or equal `0`, less than or equal the count of elements between the given
-    ///  `index` position and the end postion of the storage (`count - index`). Must be greater than or equal to
-    ///   `0`, and less than or equal `count` value.
+    ///  `index` position and the end postion of the storage (`count - index`). 
     /// - Parameter keepCapacity: a boolean flag; when set to true after the remove operation, attempts to reduce
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
-    /// - Warning: **Callee must not be empty.**
     /// - Complexity: O(1) or amortized O(1) when a capacity resize operation takes place.
     /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     /// will result in not removing any stored element, but in possibly reducing the capacity of the storage. On the other
@@ -806,7 +800,6 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeAt(index: Int, count k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(!self.isEmpty)
         precondition(index >= 0 && index <= _elementsCount - 1 )
         precondition(k <= _elementsCount - index)
         guard index != 0 else { return removeFirst(k, keepCapacity: keepCapacity) }
