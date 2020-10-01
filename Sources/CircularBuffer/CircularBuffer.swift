@@ -902,11 +902,22 @@ extension CircularBuffer {
     /// the storage capacity. Defaults to false.
     /// - Returns: an `Array<Element>` containing the removed elements, in the same order as they were inside
     /// the storage.
-    /// - Warning: **Callee must not be empty.**
     @inline(__always)
     @discardableResult
     public func removeAll(keepCapacity: Bool = true) -> [Element] {
-        precondition(!self.isEmpty)
+        guard _elementsCount > 0 else {
+            defer {
+                if !keepCapacity && _capacity > Self._minCapacity {
+                    self._capacity = Self._minCapacity
+                    self._elements.deallocate()
+                    self._elements = UnsafeMutablePointer<Element>.allocate(capacity: Self._minCapacity)
+                    self._head = 0
+                    self._tail = 0
+                }
+            }
+            
+            return []
+        }
         
         let removed = UnsafeMutablePointer<Element>.allocate(capacity: _elementsCount)
         _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: removed)
