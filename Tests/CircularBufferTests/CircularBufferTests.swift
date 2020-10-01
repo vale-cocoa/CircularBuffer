@@ -91,31 +91,34 @@ final class CircularBufferTests: XCTestCase {
     }
     
     func testInitSequence() {
-        let emptySequence = AnySequence<Int>([])
-        sut = CircularBuffer(elements: emptySequence)
+        let sequence = AnySequence(1..<5)
+        sut = CircularBuffer(elements: sequence)
+        
+        XCTAssertNotNil(sut)
+        XCTAssertFalse(sut.isEmpty)
+        XCTAssertEqual(sut._elementsCount, 4)
+        XCTAssertEqual(sutContainedElements(), Array(1..<5))
+        
+        let implementWithContiguousStorage = SequenceImplementingWithContiguousStorage(base: [1, 2, 3, 4, 5])
+        sut = CircularBuffer(elements: implementWithContiguousStorage)
+        XCTAssertNotNil(sut)
+        XCTAssertFalse(sut.isEmpty)
+        XCTAssertEqual(sut._elementsCount, implementWithContiguousStorage.base.count)
+        XCTAssertEqual(sutContainedElements(), implementWithContiguousStorage.base)
+        
+        let empty1 = AnySequence<Int>([])
+        sut = CircularBuffer(elements: empty1)
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.isEmpty)
-        XCTAssertEqual(sut._head, 0)
-        XCTAssertEqual(sut._tail, sut._elementsCount)
+        XCTAssertEqual(sut._elementsCount, 0)
+        XCTAssertEqual(sutContainedElements(), [])
         
-        let notEmptyWithoutContiguousBuffer = AnySequence([1, 2, 3, 4])
-        let implemented = notEmptyWithoutContiguousBuffer.withContiguousStorageIfAvailable { _ in
-            return true
-        }
-        XCTAssertNil(implemented)
-        
-        sut = CircularBuffer(elements: notEmptyWithoutContiguousBuffer)
+        let empty2 = SequenceImplementingWithContiguousStorage(base: [])
+        sut = CircularBuffer(elements: empty2)
         XCTAssertNotNil(sut)
-        XCTAssertFalse(sut.isEmpty)
-        XCTAssertEqual(sut.count, 4)
-        XCTAssertEqual(sutContainedElements(), [1, 2, 3 ,4])
-        
-        let notEmptyWithContiguousBuffer = NotEmptySequenceWithContiguous()
-        sut = CircularBuffer(elements: notEmptyWithContiguousBuffer)
-        XCTAssertNotNil(sut)
-        XCTAssertFalse(sut.isEmpty)
-        XCTAssertEqual(sut.count, 4)
-        XCTAssertEqual(sutContainedElements(), notEmptyWithContiguousBuffer.content)
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut._elementsCount, 0)
+        XCTAssertEqual(sutContainedElements(), [])
     }
     
     // MARK: - deinit() tests
@@ -284,6 +287,8 @@ final class CircularBufferTests: XCTestCase {
         let newElements1 = AnySequence<Int>(1...4)
         sut.push(contentsOf: newElements1)
         XCTAssertEqual(sut.count, 4)
+        XCTAssertEqual(sut.first, 4)
+        XCTAssertEqual(sut.last, 1)
         for i in 0..<4 {
             XCTAssertEqual(sut[i], 4 - i)
         }
@@ -291,8 +296,37 @@ final class CircularBufferTests: XCTestCase {
         let newElements2 = AnySequence<Int>(5...8)
         sut.push(contentsOf: newElements2)
         XCTAssertEqual(sut.count, 8)
+        XCTAssertEqual(sut.first, 8)
+        XCTAssertEqual(sut.last, 1)
         for i in 0..<8 {
             XCTAssertEqual(sut[i], (8 - i))
+        }
+        
+        let newElements3 = SequenceImplementingWithContiguousStorage(base: [9, 10, 11, 12])
+        sut.push(contentsOf: newElements3)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 12)
+        XCTAssertEqual(sut.last, 1)
+        for i in 0..<8 {
+            XCTAssertEqual(sut[i], (12 - i))
+        }
+        
+        let empty1 = AnySequence<Int>([])
+        sut.push(contentsOf: empty1)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 12)
+        XCTAssertEqual(sut.last, 1)
+        for i in 0..<8 {
+            XCTAssertEqual(sut[i], (12 - i))
+        }
+        
+        let empty2 = SequenceImplementingWithContiguousStorage(base: [])
+        sut.push(contentsOf: empty2)
+        XCTAssertEqual(sut.count, 12)
+        XCTAssertEqual(sut.first, 12)
+        XCTAssertEqual(sut.last, 1)
+        for i in 0..<8 {
+            XCTAssertEqual(sut[i], (12 - i))
         }
     }
     
@@ -1166,10 +1200,9 @@ final class CircularBufferTests: XCTestCase {
     
 }
 
-fileprivate struct NotEmptySequenceWithContiguous: Sequence {
-    let content = [1, 2, 3, 4]
-    
-    var underestimatedCount: Int = 4
+struct SequenceImplementingWithContiguousStorage: Sequence {
+    let base: Array<Int>
+
     
     typealias Element = Int
     
@@ -1179,17 +1212,18 @@ fileprivate struct NotEmptySequenceWithContiguous: Sequence {
         var idx = 0
         
         return AnyIterator<Int> {
-            guard idx < content.count else { return nil }
+            guard idx < base.count else { return nil }
             
             defer { idx += 1 }
             
-            return content[idx]
+            return base[idx]
         }
     }
     
     func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Int>) throws -> R) rethrows -> R? {
         
-        return try content.withContiguousStorageIfAvailable(body)
+        return try base.withContiguousStorageIfAvailable(body)
     }
     
 }
+
