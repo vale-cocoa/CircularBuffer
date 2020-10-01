@@ -39,8 +39,6 @@ public final class CircularBuffer<Element> {
     
     private(set) var _elementsCount: Int
     
-    
-    
     // MARK: - Initializing and deinitializing
     /// Returns a new empty `CircularBuffer` instance, with its capacity set to the minimum value.
     public init() {
@@ -99,49 +97,42 @@ public final class CircularBuffer<Element> {
         var buffer: UnsafeMutablePointer<Element>!
         var count: Int!
         
-        var done: Bool = false
-        elements.withContiguousStorageIfAvailable { elementsBuffer in
-            guard elementsBuffer.baseAddress != nil else { return }
+        if
+            let _ = elements.withContiguousStorageIfAvailable({ buff -> Bool in
+                capacity = Self._normalized(capacity: buff.count)
+                buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+                count = buff.count
+                if buff.count > 0 {
+                    buffer.initialize(from: buff.baseAddress!, count: count)
+                }
+                
+                return true
+            }) {
             
-            capacity = Self._normalized(capacity: elementsBuffer.count)
-            buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
-            count = elementsBuffer.count
-            if elementsBuffer.count > 0 {
-                buffer.initialize(from: elementsBuffer.baseAddress!, count: count)
-            }
-            
-            done = true
-        }
-        
-        if !done {
+        } else {
             let sequenceCount = elements.underestimatedCount
             var sequenceIterator = elements.makeIterator()
-            guard
-                let firstElement = sequenceIterator.next()
-            else {
-                self._capacity = Self._minCapacity
-                self._elementsCount = 0
-                self._elements = UnsafeMutablePointer<Element>.allocate(capacity: Self._minCapacity)
-                self._head = 0
-                self._tail = 0
-                
-                return
-            }
-            
-            capacity = Self._normalized(capacity: sequenceCount)
-            count = 1
-            buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
-            buffer.initialize(to: firstElement)
-            while let nextElement = sequenceIterator.next() {
-                if count + 1 >= capacity {
-                    capacity = Self._normalized(capacity: count + 1)
-                    let swap = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
-                    swap.moveInitialize(from: buffer, count: count)
-                    buffer.deallocate()
-                    buffer = swap
+            if
+                let firstElement = sequenceIterator.next() {
+                capacity = Self._normalized(capacity: sequenceCount)
+                count = 1
+                buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+                buffer.initialize(to: firstElement)
+                while let nextElement = sequenceIterator.next() {
+                    if count + 1 >= capacity {
+                        capacity = Self._normalized(capacity: count + 1)
+                        let swap = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
+                        swap.moveInitialize(from: buffer, count: count)
+                        buffer.deallocate()
+                        buffer = swap
+                    }
+                    buffer.advanced(by: count).initialize(to: nextElement)
+                    count += 1
                 }
-                buffer.advanced(by: count).initialize(to: nextElement)
-                count += 1
+            } else {
+                capacity = Self._minCapacity
+                count = 0
+                buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
             }
         }
         
@@ -417,19 +408,30 @@ extension CircularBuffer {
     /// given sequence's `underestimatedCount` value is the closest to the real count of elements of the sequence.
     @inline(__always)
     public func append<S: Sequence>(contentsOf newElements: S) where S.Iterator.Element == Element {
-        var elementsIterator = newElements.makeIterator()
         guard
-            let firstNewElement = elementsIterator.next()
-            else { return }
-        
-        let additionalElementsCount = newElements.underestimatedCount - (_capacity - _elementsCount)
-        if additionalElementsCount > 0 {
-            let newCapacity = _capacity + additionalElementsCount
-            _resizeElements(to: newCapacity)
-        }
-        append(firstNewElement)
-        while let nextNewElement = elementsIterator.next() {
-            append(nextNewElement)
+            let _ = newElements
+                .withContiguousStorageIfAvailable({ buff -> Bool in
+                    append(contentsOf: buff)
+                    
+                    return true
+                })
+        else {
+            var elementsIterator = newElements.makeIterator()
+            guard
+                let firstNewElement = elementsIterator.next()
+                else { return }
+            
+            let additionalElementsCount = newElements.underestimatedCount - (_capacity - _elementsCount)
+            if additionalElementsCount > 0 {
+                let newCapacity = _capacity + additionalElementsCount
+                _resizeElements(to: newCapacity)
+            }
+            append(firstNewElement)
+            while let nextNewElement = elementsIterator.next() {
+                append(nextNewElement)
+            }
+            
+            return
         }
     }
     
@@ -498,20 +500,32 @@ extension CircularBuffer {
     /// `underestimatedCount` value is the closest to the real count of elements of the sequence.
     @inline(__always)
     public func push<S: Sequence>(contentsOf newElements: S) where S.Iterator.Element == Element {
-        var elementsIterator = newElements.makeIterator()
         guard
-            let firstNewElement = elementsIterator.next()
-            else { return }
+            let _ = newElements
+                .withContiguousStorageIfAvailable({ buff -> Bool in
+                    prepend(contentsOf: buff.reversed())
+                    
+                    return true
+                })
+        else {
+            var elementsIterator = newElements.makeIterator()
+            guard
+                let firstNewElement = elementsIterator.next()
+                else { return }
+            
+            let additionalElementsCount = newElements.underestimatedCount - (_capacity - _elementsCount)
+            if additionalElementsCount > 0 {
+                let newCapacity = _capacity + additionalElementsCount
+                _resizeElements(to: newCapacity)
+            }
+            push(firstNewElement)
+            while let nextNewElement = elementsIterator.next() {
+                push(nextNewElement)
+            }
+            
+            return
+        }
         
-        let additionalElementsCount = newElements.underestimatedCount - (_capacity - _elementsCount)
-        if additionalElementsCount > 0 {
-            let newCapacity = _capacity + additionalElementsCount
-            _resizeElements(to: newCapacity)
-        }
-        push(firstNewElement)
-        while let nextNewElement = elementsIterator.next() {
-            push(nextNewElement)
-        }
     }
     
     /// Stores the given collection of elements at first position of the storage, mainteining their order.
@@ -1294,26 +1308,28 @@ extension CircularBuffer {
 // MARK: - Pointers helpers
 extension UnsafeMutablePointer {
     fileprivate func initialize<C: Collection>(from newElements: C) where C.Iterator.Element == Pointee {
-        var done = false
-        newElements.withContiguousStorageIfAvailable({ buff in
-            guard
-                let p = buff.baseAddress,
-                buff.count == newElements.count
-                else { return }
-            
-            if buff.count > 0 {
-                self.initialize(from: p, count: buff.count)
-            }
-            done = true
-        })
-        if !done && !newElements.isEmpty {
+        guard !newElements.isEmpty else { return }
+        
+        guard
+            let _ = newElements
+                .withContiguousStorageIfAvailable({ buff -> Bool in
+                    assert(
+                        buff.baseAddress != nil &&
+                        buff.count > 0,
+                        "CircularBuffer: Extension UnsafeMutablePointer initialize(from:), withContiguousStorageAvailable returned empty buffer despite collection is not empy."
+                        )
+                    self.initialize(from: buff.baseAddress!, count: buff.count)
+                    
+                    return true
+            })
+        else {
             var i = 0
-            var idx = newElements.startIndex
-            while idx < newElements.endIndex {
-                self.advanced(by: i).initialize(to: newElements[idx])
+            for element in newElements {
+                self.advanced(by: i).initialize(to: element)
                 i += 1
-                idx = newElements.index(after: idx)
             }
+            
+            return
         }
     }
     
