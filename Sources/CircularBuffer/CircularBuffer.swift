@@ -359,12 +359,15 @@ extension CircularBuffer {
     }
     
     // MARK: - allocateAdditionalCapacity(_:)
-    /// Allocate more space in the underlying buffer to hold actual elements count plus the addtional number in the request.
+    /// Allocate more space in the underlying buffer to hold actual elements count plus the addtional number in the
+    /// request.
     ///
     /// - Parameter _: the number of additional slots to add to the current buffer capacity. Must be positive.
     @inline(__always)
     public func allocateAdditionalCapacity(_ additionalSlots: Int) {
         precondition(additionalSlots >= 0)
+        guard additionalSlots > 0 else { return }
+        
         let newCapacity = Self._normalized(capacity: _elementsCount + additionalSlots)
         // Check if we already meet the capacity needed
         guard newCapacity > _capacity else { return }
