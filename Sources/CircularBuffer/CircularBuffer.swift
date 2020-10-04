@@ -1120,6 +1120,7 @@ extension CircularBuffer {
     
     @inline(__always)
     private func _growToNextCapacityLevel() {
+        precondition(_capacity < Int.max, "Can't grow capacity more than Int.max value: \(Int.max)")
         let newCapacity = _capacity << 1
         _resizeElements(to: newCapacity)
     }
