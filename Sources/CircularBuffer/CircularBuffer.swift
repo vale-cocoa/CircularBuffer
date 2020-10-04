@@ -1105,13 +1105,13 @@ extension CircularBuffer {
     private static var _minCapacity: Int { 4 }
     
     // Returns the next power of 2 for given capacity value, or minCapacity for
-    // a given value equal to 0. Returned value is clamped to Int.max, and given
-    // value must not be negative.
+    // a given value less than or equal to 2.
+    // Returned value is clamped to Int.max, and given value must not be negative.
     @inline(__always)
     private static func _convinientCapacityFor(capacity: Int) -> Int {
         precondition(capacity >= 0, "Negative capacity values are not allowed.")
         
-        guard capacity != 0 else { return _minCapacity }
+        guard capacity > 2 else { return _minCapacity }
         
         guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
         
