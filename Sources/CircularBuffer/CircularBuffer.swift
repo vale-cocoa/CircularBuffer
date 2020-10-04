@@ -57,7 +57,7 @@ public final class CircularBuffer<Element> {
     /// level. In general the returned instance might have a bigger capacity level than the given one, due to
     /// internal optimizations.
     public init(capacity: Int) {
-        let nCapacity = Self._normalized(capacity: capacity)
+        let nCapacity = Self._convinientCapacityFor(capacity: capacity)
         self._elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
         self._capacity = nCapacity
         self._elementsCount = 0
@@ -73,7 +73,7 @@ public final class CircularBuffer<Element> {
     /// - Note: if `count` is zero, returns an empty instance.
     public init(repeating repeated: Element, count: Int) {
         precondition(count >= 0)
-        let nCapacity = Self._normalized(capacity: count)
+        let nCapacity = Self._convinientCapacityFor(capacity: count)
         self._elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
         
         if count > 0 {
@@ -99,7 +99,7 @@ public final class CircularBuffer<Element> {
         
         if
             let _ = elements.withContiguousStorageIfAvailable({ buff -> Bool in
-                capacity = Self._normalized(capacity: buff.count)
+                capacity = Self._convinientCapacityFor(capacity: buff.count)
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                 count = buff.count
                 if buff.count > 0 {
@@ -114,13 +114,13 @@ public final class CircularBuffer<Element> {
             var sequenceIterator = elements.makeIterator()
             if
                 let firstElement = sequenceIterator.next() {
-                capacity = Self._normalized(capacity: sequenceCount)
+                capacity = Self._convinientCapacityFor(capacity: sequenceCount)
                 count = 1
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                 buffer.initialize(to: firstElement)
                 while let nextElement = sequenceIterator.next() {
                     if count + 1 >= capacity {
-                        capacity = Self._normalized(capacity: count + 1)
+                        capacity = Self._convinientCapacityFor(capacity: count + 1)
                         let swap = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                         swap.moveInitialize(from: buffer, count: count)
                         buffer.deallocate()
@@ -152,7 +152,7 @@ public final class CircularBuffer<Element> {
     /// - Note: when given an empty collection, it returns an empty instance.
     public init<C: Collection>(elements: C) where C.Iterator.Element == Element {
         let elementsCount = elements.count
-        let nCapacity = Self._normalized(capacity: elementsCount)
+        let nCapacity = Self._convinientCapacityFor(capacity: elementsCount)
         self._elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
         self._elements.initialize(from: elements)
         self._capacity = nCapacity
@@ -345,7 +345,7 @@ extension CircularBuffer {
     /// - Complexity: amortized O(1).
     @inline(__always)
     public func copy(additionalCapacity: Int = 0) -> CircularBuffer {
-        let newCapacity = additionalCapacity > 0 ? Self._normalized(capacity: _capacity + additionalCapacity) : _capacity
+        let newCapacity = additionalCapacity > 0 ? Self._convinientCapacityFor(capacity: _capacity + additionalCapacity) : _capacity
         let copy = CircularBuffer(capacity: newCapacity)
         if !isEmpty {
             _initializeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: copy._elements)
@@ -368,7 +368,7 @@ extension CircularBuffer {
         precondition(additionalSlots >= 0)
         guard additionalSlots > 0 else { return }
         
-        let newCapacity = Self._normalized(capacity: _elementsCount + additionalSlots)
+        let newCapacity = Self._convinientCapacityFor(capacity: _elementsCount + additionalSlots)
         // Check if we already meet the capacity needed
         guard newCapacity > _capacity else { return }
         
@@ -464,7 +464,7 @@ extension CircularBuffer {
             _tail = incrementIndex(finalBufIdx - 1)
         } else {
             // resize buffer to the right capacity and append newElements
-            let newCapacity = Self._normalized(capacity: _capacity + newElements.count)
+            let newCapacity = Self._convinientCapacityFor(capacity: _capacity + newElements.count)
             _resizeElements(to: newCapacity, insert: newElements, at: _elementsCount)
         }
     }
@@ -560,7 +560,7 @@ extension CircularBuffer {
             _head = newHead
         } else {
             // resize buffer to the right capacity prepending _newElements
-            let newCapacity = Self._normalized(capacity: _capacity + newElements.count)
+            let newCapacity = Self._convinientCapacityFor(capacity: _capacity + newElements.count)
             _resizeElements(to: newCapacity, insert: newElements, at: 0)
         }
     }
@@ -634,7 +634,7 @@ extension CircularBuffer {
             _tail = incrementIndex(lastBuffIdx - 1)
         } else {
             // We have to resize
-            let newCapacity = Self._normalized(capacity: _elementsCount + newElements.count)
+            let newCapacity = Self._convinientCapacityFor(capacity: _elementsCount + newElements.count)
             _resizeElements(to: newCapacity, insert: newElements, at: index)
         }
     }
@@ -834,7 +834,7 @@ extension CircularBuffer {
             // Check if we ought move remaining elements to a smaller buffer, or if we
             // ought shift them inside the actual buffer to occupy the space left by
             //the removal:
-            let newCapacity = keepCapacity ? _capacity : Self._normalized(capacity: _elementsCount - k)
+            let newCapacity = keepCapacity ? _capacity : Self._convinientCapacityFor(capacity: _elementsCount - k)
             if newCapacity < _capacity {
                 // Let's move remaining elements to a smaller buffer…
                 let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
@@ -994,7 +994,7 @@ extension CircularBuffer {
             } else {
                 // It's a replace operation!
                 let newCount = _elementsCount - subRange.count + newElements.count
-                let newCapacity = Self._normalized(capacity: newCount)
+                let newCapacity = Self._convinientCapacityFor(capacity: newCount)
                 if newCapacity == _capacity {
                     // No resize is needed, operation has to be done in place
                     let buffIdx = bufferIndex(from: subRange.lowerBound)
@@ -1104,18 +1104,18 @@ extension CircularBuffer {
     @inline(__always)
     private static var _minCapacity: Int { 4 }
     
+    // Returns the next power of 2 for given capacity value, or minCapacity for
+    // a given value equal to 0. Returned value is clamped to Int.max, and given
+    // value must not be negative.
     @inline(__always)
-    private static func _normalized(capacity: Int) -> Int {
-        var normalized = Swift.max(_minCapacity, capacity)
-        if (normalized & (~normalized + 1)) != normalized {
-            var candidate = 1
-            while candidate < normalized {
-                candidate = candidate << 1
-            }
-            normalized = candidate
-        }
+    private static func _convinientCapacityFor(capacity: Int) -> Int {
+        precondition(capacity >= 0, "Negative capacity values are not allowed.")
         
-        return normalized
+        guard capacity != 0 else { return _minCapacity }
+        
+        guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
+        
+        return 1 << (Int.bitWidth - (capacity - 1).leadingZeroBitCount)
     }
     
     @inline(__always)
@@ -1132,7 +1132,7 @@ extension CircularBuffer {
             _resizeElements(to: Self._minCapacity)
         }
         
-        let newCapacity = Self._normalized(capacity: _elementsCount)
+        let newCapacity = Self._convinientCapacityFor(capacity: _elementsCount)
         if newCapacity < _capacity {
             _resizeElements(to: newCapacity)
         }
@@ -1341,3 +1341,4 @@ extension UnsafeMutablePointer {
     }
     
 }
+
