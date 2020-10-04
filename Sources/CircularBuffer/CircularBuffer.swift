@@ -1111,7 +1111,7 @@ extension CircularBuffer {
     private static func _convinientCapacityFor(capacity: Int) -> Int {
         precondition(capacity >= 0, "Negative capacity values are not allowed.")
         
-        guard capacity > 2 else { return _minCapacity }
+        guard capacity > (_minCapacity >> 1) else { return _minCapacity }
         
         guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
         
