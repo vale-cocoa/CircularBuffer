@@ -292,14 +292,14 @@ extension CircularBuffer {
     @inline(__always)
     public subscript(position: Int) -> Element {
         get {
-            checkSubscriptBounds(for: position)
+            _checkSubscriptBounds(for: position)
             let idx = bufferIndex(from: position)
             
             return _elements.advanced(by: idx).pointee
         }
         
         set {
-            checkSubscriptBounds(for: position)
+            _checkSubscriptBounds(for: position)
             let idx = bufferIndex(from: position)
             _elements.advanced(by: idx).pointee = newValue
         }
@@ -695,7 +695,7 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeFirst(_ k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(k >= 0 && k <= _elementsCount)
+        precondition(k >= 0 && k <= _elementsCount, "operation not permitted with given count value")
         guard
             k < _elementsCount
         else { return removeAll(keepCapacity: keepCapacity) }
@@ -747,7 +747,7 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeLast(_ k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(k >= 0 && k <= _elementsCount)
+        precondition(k >= 0 && k <= _elementsCount, "operation not permitted with given count value")
         guard k < _elementsCount else { return removeAll(keepCapacity: keepCapacity) }
         
         guard k > 0 else {
@@ -803,8 +803,8 @@ extension CircularBuffer {
     @discardableResult
     @inline(__always)
     public func removeAt(index: Int, count k: Int, keepCapacity: Bool = true) -> [Element] {
-        precondition(index >= 0 && index <= _elementsCount - 1 )
-        precondition(k <= _elementsCount - index)
+        _checkSubscriptBounds(for: index)
+        precondition(k >= 0 && k <= _elementsCount - index, "operation not permitted with given count value")
         guard index != 0 else { return removeFirst(k, keepCapacity: keepCapacity) }
         
         guard index != _elementsCount - 1 else { return removeLast(k, keepCapacity: keepCapacity) }
@@ -964,7 +964,7 @@ extension CircularBuffer {
     /// elements stored in the collection.
     @inline(__always)
     public func replace<C: Collection>(subRange: Range<Int>, with newElements: C) where C.Iterator.Element == Element {
-        precondition(subRange.lowerBound >= 0 && subRange.upperBound <= _elementsCount)
+        precondition(subRange.lowerBound >= 0 && subRange.upperBound <= _elementsCount, "range of indexes out of bounds")
         if subRange.count == 0 {
             // It's an insertion
             guard !newElements.isEmpty else { return }
@@ -1076,8 +1076,8 @@ extension CircularBuffer {
 // MARK: - Index helpers
 extension CircularBuffer {
     @inline(__always)
-    private func checkSubscriptBounds(for position: Int) {
-        assert(position >= 0 && position < _elementsCount)
+    private func _checkSubscriptBounds(for position: Int) {
+        precondition(position >= 0 && position < _elementsCount, "subscript index out of bounds")
     }
     
     @inline(__always)
