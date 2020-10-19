@@ -268,6 +268,86 @@ extension CircularBuffer {
         return UnsafeBufferPointer(start: _elements.advanced(by: _head), count: _elementsCount)
     }
     
+    /// Calls a closure with a pointer to the CircularBuffer contiguous storage.
+    ///
+    /// Often, the optimizer can eliminate bounds checks within an CircularBuffer
+    /// algorithm, but when that fails, invoking the same algorithm on the
+    /// buffer pointer passed into your closure lets you trade safety for speed.
+    ///
+    /// The pointer passed as an argument to `body` is valid only during the
+    /// execution of `withUnsafeBufferPointer(_:)`. Do not store or return the
+    /// pointer for later use.
+    ///
+    /// - Parameter body:   A closure with an `UnsafeBufferPointer` parameter that
+    ///                     points to the contiguous storage for the CircularBuffer.  If no such storage exists, it is
+    ///                     created. If `body` has a return value, that value is also used as the return value
+    ///                     for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
+    ///                     valid only for the duration of the method's execution.
+    /// - Returns: The return value, if any, of the `body` closure parameter.
+    @inline(__always)
+    public func withUnsafeBufferPointer<R>(_ body:(UnsafeBufferPointer<Element>) throws -> R) rethrows -> R {
+        if _head + _elementsCount > _capacity {
+            _rotateBufferHeadToZero()
+        }
+        
+        let buff = UnsafeBufferPointer(start: _elements.advanced(by: _head), count: _elementsCount)
+        
+        return try body(buff)
+    }
+    
+    /// Calls the given closure with a pointer to the CircularBuffer's mutable contiguous storage.
+    ///
+    /// Often, the optimizer can eliminate bounds checks within an CircularBuffer
+    /// algorithm, but when that fails, invoking the same algorithm on the
+    /// buffer pointer passed into your closure lets you trade safety for speed.
+    ///
+    /// The pointer passed as an argument to `body` is valid only during the
+    /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
+    /// return the pointer for later use.
+    ///
+    /// - Warning:  Do not rely on anything about the CircularBuffer that is the target of
+    ///             this method during execution of the `body` closure; it might not
+    ///             appear to have its correct value. Instead, use only the
+    ///             `UnsafeMutableBufferPointer` argument to `body`.
+    ///
+    /// - Parameter body:   A closure with an `UnsafeMutableBufferPointer`
+    ///                     parameter that points to the contiguous storage for the CircularBuffer.
+    ///                     If no such storage exists, it is created. If `body` has a return value, that value is also
+    ///                     used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+    ///                     method. The pointer argument is valid only for the duration of the
+    ///                     method's execution.
+    /// - Returns: The return value, if any, of the `body` closure parameter.
+    @inline(__always)
+    public func withUnsafeMutableBufferPointer<R>(_ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R) rethrows -> R {
+        if _head + _elementsCount > _capacity {
+            _rotateBufferHeadToZero()
+        }
+        let elements = _elements
+        let prevCapacity = _capacity
+        let prevCount = _elementsCount
+        let prevHead = _head
+        let prevTail = _tail
+        
+        _elements = UnsafeMutablePointer<Element>.allocate(capacity: Self._minCapacity)
+        _capacity = Self._minCapacity
+        _elementsCount = 0
+        _head = 0
+        _tail = 0
+        
+        var buff = UnsafeMutableBufferPointer<Element>(start: elements.advanced(by: prevHead), count: prevCount)
+        defer {
+            precondition(buff.baseAddress == elements && buff.count == prevCount, "CircularBuffer withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+            self._elements.deallocate()
+            self._elements = elements
+            self._capacity = prevCapacity
+            self._elementsCount = prevCount
+            self._head = prevHead
+            self._tail = prevTail
+        }
+        
+        return try body(&buff)
+    }
+    
 }
 
 // MARK: - Common operations
