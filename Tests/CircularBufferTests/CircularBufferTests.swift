@@ -1115,39 +1115,81 @@ final class CircularBufferTests: XCTestCase {
         }
     }
     
-    // MARK: - Unsafe(Mutable)BufferPointer tests
-    func test_unsafeMutableBufferPointer() {
-        var bufferPointer = sut.unsafeMutableBufferPointer
-        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
-        XCTAssertEqual(bufferPointer.count, sut.count)
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+    // MARK: - withUnsafeBufferPointer(_:) tests
+    func testWithUnsafeBufferPointer_whenBodyThrows_rethrows() {
+        let throwingClosure: (UnsafeBufferPointer<Int>) throws -> Array<Int> = { _ in
+            throw NSError(domain: "com.vdl.circularBuffer.tests", code: 1, userInfo: nil)
+        }
+        XCTAssertThrowsError(try sut.withUnsafeBufferPointer(throwingClosure))
         
         whenFull()
-        bufferPointer = sut.unsafeMutableBufferPointer
-        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
-        XCTAssertEqual(bufferPointer.count, sut.count)
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
-        
-        bufferPointer[2] += 10
-        XCTAssertEqual(bufferPointer[2], sut[2])
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
-        
-        sut[2] -= 10
-        XCTAssertEqual(bufferPointer[2], sut[2])
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        XCTAssertThrowsError(try sut.withUnsafeBufferPointer(throwingClosure))
     }
     
-    func test_unsafeBufferPointer() {
-        var bufferPointer = sut.unsafeBufferPointer
-        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
-        XCTAssertEqual(bufferPointer.count, sut.count)
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+    func testWithUnsafeBufferPointer_whenBodyDoesntThrow_returnsResult() {
+        let notThrowingBody: (UnsafeBufferPointer<Int>) -> Array<Int> =  { buffer in
+            Array(buffer)
+        }
+        
+        // when empty
+        var result = sut.withUnsafeBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, [])
+        
+        // when not empty
+        whenFull()
+        result = sut.withUnsafeBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, sutContainedElements())
+        
+        // when underlaying buffer wraps around:
+        sut.popFirst()
+        sut.append(100)
+        XCTAssertGreaterThan(sut._head + sut._elementsCount, sut._capacity)
+        let sutElementsPriorRotation = sutContainedElements()
+        result = sut.withUnsafeBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, sutContainedElements())
+        XCTAssertEqual(sutContainedElements(), sutElementsPriorRotation)
+    }
+    
+    // MARK: - withUnsafeMutableBufferPointer(_:) tests
+    func testWithUnsafeMutableBufferPointer_whenBodyThrows_rethrows() {
+        let throwingClosure: (inout UnsafeMutableBufferPointer<Int>) throws -> Array<Int> = { _ in
+            throw NSError(domain: "com.vdl.circularBuffer.tests", code: 1, userInfo: nil)
+        }
+        XCTAssertThrowsError(try sut.withUnsafeMutableBufferPointer(throwingClosure))
         
         whenFull()
-        bufferPointer = sut.unsafeBufferPointer
-        XCTAssertEqual(bufferPointer.baseAddress, sut._elements)
-        XCTAssertEqual(bufferPointer.count, sut.count)
-        XCTAssertEqual(Array(bufferPointer), sutContainedElements())
+        XCTAssertThrowsError(try sut.withUnsafeMutableBufferPointer(throwingClosure))
+    }
+    
+    func test_withUnsafeMutableBufferPointer_whenBodyDoesnThrow_returnsResult() {
+        let notThrowingBody: (inout UnsafeMutableBufferPointer<Int>) -> Array<Int> = { buffer in
+            for i in buffer.startIndex..<buffer.endIndex {
+                buffer[i] += 10
+            }
+            
+            return Array(buffer)
+        }
+        
+        // when empty
+        var result = sut.withUnsafeMutableBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, [])
+        
+        // when not empty
+        whenFull()
+        var expectedResult = sutContainedElements().map { $0 + 10 }
+        result = sut.withUnsafeMutableBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, expectedResult)
+        XCTAssertEqual(sutContainedElements(), expectedResult)
+        
+        // when
+        // when underlaying buffer wraps around:
+        sut.popFirst()
+        sut.append(100)
+        XCTAssertGreaterThan(sut._head + sut._elementsCount, sut._capacity)
+        expectedResult = sutContainedElements().map { $0 + 10 }
+        result = sut.withUnsafeMutableBufferPointer(notThrowingBody)
+        XCTAssertEqual(result, expectedResult)
+        XCTAssertEqual(sutContainedElements(), expectedResult)
     }
     
     // MARK: - performance tests
