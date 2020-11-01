@@ -171,6 +171,9 @@ public final class CircularBuffer<Element> {
 // MARK: - Public Interface
 // MARK: - Computed properties
 extension CircularBuffer {
+    /// The number of elelements the buffer can hold without having to reallocate memory.
+    public var capacity: Int { _capacity }
+    
     /// Flags if all the capacity is taken.
     public var isFull: Bool {
         _elementsCount == _capacity

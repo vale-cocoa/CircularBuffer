@@ -138,7 +138,8 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertNil(sut?._elements)
     }
     
-    // MARK: - first, last, count public vars tests
+    // MARK: - first, last, count, isEmpty, capacity, isFull
+    // public properties tests
     func test_first() {
         XCTAssertNil(sut.first)
         sut = CircularBuffer<Int>(repeating: 90, count: 4)
@@ -168,6 +169,30 @@ final class CircularBufferTests: XCTestCase {
         
         whenFull()
         XCTAssertEqual(sut.count, sut._elementsCount)
+    }
+    
+    func testIsEmpty() {
+        XCTAssertEqual(sut.count, 0)
+        XCTAssertTrue(sut.isEmpty)
+        sut.append(10)
+        XCTAssertGreaterThan(sut.count, 0)
+        XCTAssertFalse(sut.isEmpty)
+    }
+    
+    func testCapacity() {
+        XCTAssertEqual(sut._capacity, sut.capacity)
+        let prevCapacity = sut._capacity
+        sut.allocateAdditionalCapacity(10)
+        XCTAssertGreaterThan(sut._capacity, prevCapacity)
+        XCTAssertEqual(sut._capacity, sut.capacity)
+    }
+    
+    func testIsFull() {
+        XCTAssertGreaterThan(sut._capacity, sut._elementsCount)
+        XCTAssertFalse(sut.isFull)
+        whenFull()
+        XCTAssertEqual(sut._capacity, sut._elementsCount)
+        XCTAssertTrue(sut.isFull)
     }
     
     // MARK: - allocateAdditionalCapacity(_:) tests
