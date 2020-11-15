@@ -168,6 +168,9 @@ extension CircularBuffer {
         _elementsCount
     }
     
+    /// The number of additional elements that can be stored without reallocating memory.
+    public var residualCapacity: Int { _residualCapacity }
+    
     /// The element stored at first position.
     ///
     /// - Note: equals `last` when there is just one element stored, `nil` when `isEmpty` is `true`

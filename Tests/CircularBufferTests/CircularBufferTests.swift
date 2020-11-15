@@ -195,8 +195,20 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertTrue(sut.isFull)
     }
     
-    // MARK: - allocateAdditionalCapacity(_:) tests
-    func testAllocateAdditionalCapacity_whenGivenZero_thenDoesNothing() {
+    func testResidualCapacity() {
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut.residualCapacity, sut.capacity)
+        whenFull()
+        XCTAssertTrue(sut.isFull)
+        XCTAssertEqual(sut.residualCapacity, 0)
+        sut.removeLast(2)
+        XCTAssertFalse(sut.isFull)
+        XCTAssertFalse(sut.isEmpty)
+        XCTAssertEqual(sut.residualCapacity, sut.capacity - sut.count)
+    }
+    
+    // MARK: - reserveCapacity(_:) tests
+    func testReserveCapacity_whenGivenZero_thenDoesNothing() {
         let prevCapacity = sut._capacity
         let prevBuffer = sut._elements
         
@@ -205,7 +217,7 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sut._elements, prevBuffer)
     }
     
-    func testAllocateAdditionalCapacity_whenGivenMoreThanZeroAndActualCapacityIsEnough_thenDoesNothing() {
+    func testReserveCapacity_whenGivenMoreThanZeroAndActualCapacityIsEnough_thenDoesNothing() {
         whenFull()
         sut.append(5)
         let prevCapacity = sut._capacity
@@ -221,7 +233,7 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sutContainedElements(), prevContainedElements)
     }
     
-    func testAllocateAdditionalCapacity_whenGivenMoreThanZeroAndActualCapacityIsNotEnough_thenCapacityIncreasesAndBufferGetCopiedToALargerOne() {
+    func testReserveCapacity_whenGivenMoreThanZeroAndActualCapacityIsNotEnough_thenCapacityIncreasesAndBufferGetsCopiedToALargerOne() {
         whenFull()
         let prevCapacity = sut._capacity
         let prevContainedElements = sutContainedElements()
