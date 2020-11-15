@@ -182,7 +182,7 @@ final class CircularBufferTests: XCTestCase {
     func testCapacity() {
         XCTAssertEqual(sut._capacity, sut.capacity)
         let prevCapacity = sut._capacity
-        sut.allocateAdditionalCapacity(10)
+        sut.reserveCapacity(10)
         XCTAssertGreaterThan(sut._capacity, prevCapacity)
         XCTAssertEqual(sut._capacity, sut.capacity)
     }
@@ -200,7 +200,7 @@ final class CircularBufferTests: XCTestCase {
         let prevCapacity = sut._capacity
         let prevBuffer = sut._elements
         
-        sut.allocateAdditionalCapacity(0)
+        sut.reserveCapacity(0)
         XCTAssertEqual(sut._capacity, prevCapacity)
         XCTAssertEqual(sut._elements, prevBuffer)
     }
@@ -215,7 +215,7 @@ final class CircularBufferTests: XCTestCase {
         let residualEmptySpots = sut._capacity - sut._elementsCount
         XCTAssertGreaterThan(residualEmptySpots, 0)
         
-        sut.allocateAdditionalCapacity(residualEmptySpots)
+        sut.reserveCapacity(residualEmptySpots)
         XCTAssertEqual(sut._capacity, prevCapacity)
         XCTAssertEqual(sut._elements, prevBuffer)
         XCTAssertEqual(sutContainedElements(), prevContainedElements)
@@ -232,7 +232,7 @@ final class CircularBufferTests: XCTestCase {
         let residualEmptySpots = sut._capacity - sut._elementsCount
         XCTAssertEqual(residualEmptySpots, 0)
         
-        sut.allocateAdditionalCapacity(1)
+        sut.reserveCapacity(1)
         XCTAssertGreaterThan(sut._capacity, prevCapacity)
         XCTAssertEqual(sutContainedElements(), prevContainedElements)
         XCTAssertNotEqual(sut._elements, prevBuffer)
