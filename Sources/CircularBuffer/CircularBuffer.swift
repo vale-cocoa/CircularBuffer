@@ -110,7 +110,8 @@ public final class CircularBuffer<Element> {
             let sequenceCount = elements.underestimatedCount
             var sequenceIterator = elements.makeIterator()
             if
-                let firstElement = sequenceIterator.next() {
+                let firstElement = sequenceIterator.next()
+            {
                 capacity = Self._convenientCapacityFor(capacity: sequenceCount)
                 count = 1
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
@@ -207,7 +208,7 @@ extension CircularBuffer {
     /// - Returns: The return value, if any, of the `body` closure parameter.
     public func withUnsafeBufferPointer<R>(_ body:(UnsafeBufferPointer<Element>) throws -> R) rethrows -> R {
         if _head + _elementsCount > _capacity {
-            _rotateBufferHeadToZero()
+            _fastRotateBufferHeadToZero()
         }
         
         let buff = UnsafeBufferPointer(start: _elements.advanced(by: _head), count: _elementsCount)
@@ -239,7 +240,7 @@ extension CircularBuffer {
     /// - Returns: The return value, if any, of the `body` closure parameter.
     public func withUnsafeMutableBufferPointer<R>(_ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R) rethrows -> R {
         if _head + _elementsCount > _capacity {
-            _rotateBufferHeadToZero()
+            _fastRotateBufferHeadToZero()
         }
         // save actual state:
         let elements = _elements
@@ -248,14 +249,14 @@ extension CircularBuffer {
         let prevHead = _head
         let prevTail = _tail
         
-        // change state to empty while executing body
+        // temporarly change internal state to empty
         _elements = UnsafeMutablePointer<Element>.allocate(capacity: Self._minCapacity)
         _capacity = Self._minCapacity
         _elementsCount = 0
         _head = 0
         _tail = 0
         
-        // prepare the buffer to use in body
+        // prepare the buffer that will be passed to body
         var buff = UnsafeMutableBufferPointer<Element>(start: elements.advanced(by: prevHead), count: prevCount)
         
         defer {
@@ -367,19 +368,13 @@ extension CircularBuffer {
     /// - Parameter _: the number of minimum free slots the buffer should have. Must be positive.
     public func reserveCapacity(_ minimumCapacity: Int) {
         precondition(minimumCapacity >= 0)
-        guard minimumCapacity > 0,
-              _residualCapacity < minimumCapacity
+        guard
+            minimumCapacity > 0,
+            _residualCapacity < minimumCapacity
         else { return }
         
         let newCapacity = Self._convenientCapacityFor(capacity: _elementsCount + minimumCapacity)
-        
-        let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
-        _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: newBuff)
-        _elements.deallocate()
-        _elements = newBuff
-        _capacity = newCapacity
-        _head = 0
-        _tail = incrementIndex(_elementsCount - 1)
+        _fastResizeElements(to: newCapacity)
     }
     
 }
@@ -425,8 +420,8 @@ extension CircularBuffer {
             
             let additionalElementsCount = newElements.underestimatedCount - _residualCapacity
             if additionalElementsCount > 0 {
-                let newCapacity = _capacity + additionalElementsCount
-                _resizeElements(to: newCapacity)
+                let newCapacity = Self._convenientCapacityFor(capacity: _capacity + additionalElementsCount)
+                _fastResizeElements(to: newCapacity)
             }
             append(firstNewElement)
             while let nextNewElement = elementsIterator.next() {
@@ -450,7 +445,7 @@ extension CircularBuffer {
         } else {
             // resize buffer to the right capacity and append newElements
             let newCapacity = Self._convenientCapacityFor(capacity: _capacity + newElements.count)
-            _resizeElements(to: newCapacity, insert: newElements, at: _elementsCount)
+            _fastResizeElements(to: newCapacity, insert: newElements, at: _elementsCount)
         }
     }
     
@@ -500,8 +495,8 @@ extension CircularBuffer {
             
             let additionalElementsCount = newElements.underestimatedCount - _residualCapacity
             if additionalElementsCount > 0 {
-                let newCapacity = _capacity + additionalElementsCount
-                _resizeElements(to: newCapacity)
+                let newCapacity = Self._convenientCapacityFor(capacity: _capacity + additionalElementsCount) 
+                _fastResizeElements(to: newCapacity)
             }
             push(firstNewElement)
             while let nextNewElement = elementsIterator.next() {
@@ -542,7 +537,7 @@ extension CircularBuffer {
         } else {
             // resize buffer to the right capacity prepending _newElements
             let newCapacity = Self._convenientCapacityFor(capacity: _capacity + newElements.count)
-            _resizeElements(to: newCapacity, insert: newElements, at: 0)
+            _fastResizeElements(to: newCapacity, insert: newElements, at: 0)
         }
     }
     
@@ -619,7 +614,7 @@ extension CircularBuffer {
         } else {
             // We have to resize
             let newCapacity = Self._convenientCapacityFor(capacity: _elementsCount + newElements.count)
-            _resizeElements(to: newCapacity, insert: newElements, at: index)
+            _fastResizeElements(to: newCapacity, insert: newElements, at: index)
         }
     }
     
@@ -688,7 +683,7 @@ extension CircularBuffer {
         guard k > 0 else {
             defer {
                 if !keepCapacity {
-                    _reduceCapacityToCurrentCount()
+                    _reduceCapacityForCurrentElementsCount()
                 }
             }
             
@@ -703,7 +698,7 @@ extension CircularBuffer {
             _elementsCount -= k
             _tail = incrementIndex(_head + _elementsCount - 1)
             if !keepCapacity {
-                _reduceCapacityToCurrentCount()
+                _reduceCapacityForCurrentElementsCount()
             }
         }
         
@@ -739,7 +734,7 @@ extension CircularBuffer {
         guard k > 0 else {
             defer {
                 if !keepCapacity {
-                    _reduceCapacityToCurrentCount()
+                    _reduceCapacityForCurrentElementsCount()
                 }
             }
             
@@ -754,9 +749,7 @@ extension CircularBuffer {
             _elementsCount -= k
             _tail = buffIdxStart
             if !keepCapacity {
-                _reduceCapacityToCurrentCount()
-            } else {
-                
+                _reduceCapacityForCurrentElementsCount()
             }
         }
         
@@ -804,7 +797,7 @@ extension CircularBuffer {
         guard k > 0 else {
             defer {
                 if !keepCapacity {
-                    _reduceCapacityToCurrentCount()
+                    _reduceCapacityForCurrentElementsCount()
                 }
             }
             
@@ -1116,43 +1109,41 @@ extension CircularBuffer {
     private func _growToNextCapacityLevel() {
         precondition(_capacity < Int.max, "Can't grow capacity more than Int.max value: \(Int.max)")
         let newCapacity = _capacity << 1
-        _resizeElements(to: newCapacity)
+        _fastResizeElements(to: newCapacity)
     }
     
     @inline(__always)
-    private func _reduceCapacityToCurrentCount() {
-        guard _capacity > 4 else { return }
-        
-        if isEmpty {
-            _resizeElements(to: Self._minCapacity)
+    private func _reduceCapacityForCurrentElementsCount() {
+        guard !isEmpty else {
+            if _capacity > Self._minCapacity {
+                _fastResizeElements(to: Self._minCapacity)
+            }
+            
+            return
         }
+        
+        guard _capacity >= Self._minCapacity << 2 else { return }
         
         let newCapacity = Self._convenientCapacityFor(capacity: _elementsCount)
-        if newCapacity < _capacity {
-            _resizeElements(to: newCapacity)
+        if newCapacity <= _capacity >> 2 {
+            _fastResizeElements(to: newCapacity)
         }
+        
     }
     
     @inline(__always)
-    private func _rotateBufferHeadToZero() {
-        guard _head != 0 else { return }
+    private func _fastRotateBufferHeadToZero() {
+        let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: _capacity)
         
-        if _elementsCount > 0 {
-            let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: _capacity)
-            _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: newBuff)
-            _elements.deallocate()
-            _elements = newBuff
-        }
-        
+        _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: newBuff)
+        _elements.deallocate()
+        _elements = newBuff
         _head = 0
         _tail = incrementIndex(_elementsCount - 1)
     }
     
     @inline(__always)
-    private func _resizeElements(to newCapacity: Int) {
-        precondition(_elementsCount <= newCapacity, "Can't fit contained elements in proposed capacity")
-        guard _capacity != newCapacity else { return }
-        
+    private func _fastResizeElements(to newCapacity: Int) {
         let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         
         _moveInitialzeFromElements(advancedToBufferIndex: _head, count: _elementsCount, to: newBuff)
@@ -1164,11 +1155,7 @@ extension CircularBuffer {
     }
     
     @inline(__always)
-    private func _resizeElements<C: Collection>(to newCapacity: Int, insert newElements: C, at index: Int) where C.Iterator.Element == Element {
-        precondition(_elementsCount + newElements.count <= newCapacity, "Can't fit all elements in proposed capacity")
-        precondition(index >= 0 && index <= _elementsCount)
-        precondition(!newElements.isEmpty)
-        
+    private func _fastResizeElements<C: Collection>(to newCapacity: Int, insert newElements: C, at index: Int) where C.Iterator.Element == Element {
         let newBuffer = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         
         // copy newElements inside newBuffer
@@ -1315,11 +1302,6 @@ extension UnsafeMutablePointer {
         guard
             let _ = newElements
                 .withContiguousStorageIfAvailable({ buff -> Bool in
-                    assert(
-                        buff.baseAddress != nil &&
-                        buff.count > 0,
-                        "CircularBuffer: Extension UnsafeMutablePointer initialize(from:), withContiguousStorageAvailable returned empty buffer despite collection is not empty."
-                        )
                     self.initialize(from: buff.baseAddress!, count: buff.count)
                     
                     return true

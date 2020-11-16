@@ -466,7 +466,7 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sut.first, 4)
     }
     
-    func testRemoveFirst_whenZeroAndKeepCapacityIsFalseAndCapacityCantBeReducedAnyFurther_doesntReduceCapacity() {
+    func testRemoveFirst_whenZeroAndKeepCapacityIsFalseAndCapacityCantBeReducedAnyFurther_thenDoesntReduceCapacity() {
         whenFull()
         XCTAssert(sut.isFull)
         var expectedCapacity = sut._capacity
@@ -479,11 +479,13 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sut._capacity, expectedCapacity)
     }
     
-    func testRemoveFirst_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
+    func testRemoveFirst_whenCountIsZeroAndKeepCapacityIsFalse_thenReducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(5)
-        sut.popLast()
+        sut.append(contentsOf: 5...10)
+        for _ in 5...10 {
+            sut.popLast()
+        }
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -491,11 +493,11 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sut._capacity, expectedCapacity)
     }
     
-    func testRemoveFirst_whenKeepCapacityFalseAndRemovesEnoughElementsToTriggerResize_capacityGetsResized() {
+    func testRemoveFirst_whenKeepCapacityFalseAndRemovesEnoughElementsToTriggerResize_thenCapacityGetsResized() {
         whenFull()
         var prevCapacity = sut._capacity
         var added = 0
-        while sut._capacity <= prevCapacity {
+        while sut._capacity <= (prevCapacity << 1) {
             added += 1
             sut.append(added + 4)
         }
@@ -597,8 +599,10 @@ final class CircularBufferTests: XCTestCase {
     func testRemoveLast_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(5)
-        sut.popLast()
+        sut.append(contentsOf: 5...10)
+        for _ in 5...10 {
+            sut.popLast()
+        }
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -610,7 +614,7 @@ final class CircularBufferTests: XCTestCase {
         whenFull()
         var prevCapacity = sut._capacity
         var added = 0
-        while sut._capacity <= prevCapacity {
+        while sut._capacity <= (prevCapacity << 1) {
             added += 1
             sut.append(added + 4)
         }
@@ -690,8 +694,10 @@ final class CircularBufferTests: XCTestCase {
     func testRemoveAt_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(5)
-        sut.popLast()
+        sut.append(contentsOf: 5...10)
+        for _ in 5...10 {
+            sut.popLast()
+        }
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -1230,12 +1236,20 @@ final class CircularBufferTests: XCTestCase {
     }
     
     // MARK: - performance tests
-    func testCircularBufferPerformance() {
-        measure(performanceLoopCircularBuffer)
+    func testCircularBufferPerformance_smallCount() {
+        measure(performanceLoopCircularBuffer_smallCount)
     }
     
-    func testArrayPerformance() {
-        measure(performanceLoopArray)
+    func testArrayPerformance_smallCount() {
+        measure(performanceLoopArray_smallCount)
+    }
+    
+    func testCircularBufferPerformance_largeCount() {
+        measure(performanceLoopCircularBuffer_largeCount)
+    }
+    
+    func testArrayPerformance_largeCount() {
+        measure(performanceLoopArray_largeCount)
     }
     
     // MARK: - private helpers
@@ -1272,7 +1286,7 @@ final class CircularBufferTests: XCTestCase {
         return result
     }
     
-    private func performanceLoopCircularBuffer() {
+    private func performanceLoopCircularBuffer_smallCount() {
         let outerCount: Int = 10_000
         let innerCount: Int = 20
         var accumulator = 0
@@ -1290,9 +1304,45 @@ final class CircularBufferTests: XCTestCase {
         XCTAssert(accumulator == 0)
     }
     
-    private func performanceLoopArray() {
+    private func performanceLoopArray_smallCount() {
         let outerCount: Int = 10_000
         let innerCount: Int = 20
+        var accumulator = 0
+        for _ in 1...outerCount {
+            var array = Array<Int>()
+            for i in 1...innerCount {
+                array.append(i)
+                accumulator ^= (array.last ?? 0)
+            }
+            for _ in 1...innerCount {
+                accumulator ^= (array.first ?? 0)
+                array.remove(at: 0)
+            }
+        }
+        XCTAssert(accumulator == 0)
+    }
+    
+    private func performanceLoopCircularBuffer_largeCount() {
+        let outerCount: Int = 10
+        let innerCount: Int = 20_000
+        var accumulator = 0
+        for _ in 1...outerCount {
+            let ringBuffer = CircularBuffer<Int>(capacity: innerCount)
+            for i in 1...innerCount {
+                ringBuffer.append(i)
+                accumulator ^= (ringBuffer.last ?? 0)
+            }
+            for _ in 1...innerCount {
+                accumulator ^= (ringBuffer.first ?? 0)
+                ringBuffer.popFirst()
+            }
+        }
+        XCTAssert(accumulator == 0)
+    }
+    
+    private func performanceLoopArray_largeCount() {
+        let outerCount: Int = 10
+        let innerCount: Int = 20_000
         var accumulator = 0
         for _ in 1...outerCount {
             var array = Array<Int>()
