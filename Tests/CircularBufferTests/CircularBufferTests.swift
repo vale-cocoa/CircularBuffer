@@ -418,6 +418,35 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertNotEqual(sut.first, oldFirst)
     }
     
+    func testPopFirst_reducesCapacityWhenPossible() {
+        sut = CircularBuffer(elements: 1...6)
+        var prevCapacity = sut.capacity
+        while let _ = sut.popFirst() {
+            if !sut.isEmpty {
+                XCTAssertEqual(sut.capacity, prevCapacity)
+            }
+        }
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        
+        sut = CircularBuffer(elements: 1...24)
+        prevCapacity = sut.capacity
+        for _ in 1...8 { sut.popFirst() }
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        for _ in 1...8 { sut.popFirst() }
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, prevCapacity >> 2)
+        
+        // when a push triggers a capacity resize, a pop immediately after
+        // doesn't trigger a capacity downsizing:
+        prevCapacity = sut.capacity
+        sut.push(10)
+        XCTAssertGreaterThan(sut.capacity, prevCapacity)
+        prevCapacity = sut._capacity
+        sut.popFirst()
+        XCTAssertEqual(sut.capacity, prevCapacity)
+    }
+    
     // MARK: - removeFirst(_:keepCapacity:) tests
     func testRemoveFirst_whenZero_doesntRemoveAnyElementAndReturnsEmptyArray() {
         whenFull()
@@ -482,10 +511,7 @@ final class CircularBufferTests: XCTestCase {
     func testRemoveFirst_whenCountIsZeroAndKeepCapacityIsFalse_thenReducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(contentsOf: 5...10)
-        for _ in 5...10 {
-            sut.popLast()
-        }
+        sut.reserveCapacity(5)
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -524,6 +550,35 @@ final class CircularBufferTests: XCTestCase {
         let oldLast = sut.last
         XCTAssertEqual(sut.popLast(), oldLast)
         XCTAssertNotEqual(sut.last, oldLast)
+    }
+    
+    func testPopLast_reducesCapacityWhenPossible() {
+        sut = CircularBuffer(elements: 1...6)
+        var prevCapacity = sut.capacity
+        while let _ = sut.popLast() {
+            if !sut.isEmpty {
+                XCTAssertEqual(sut.capacity, prevCapacity)
+            }
+        }
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        
+        sut = CircularBuffer(elements: 1...24)
+        prevCapacity = sut.capacity
+        for _ in 1...8 { sut.popLast() }
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        for _ in 1...8 { sut.popLast() }
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, prevCapacity >> 2)
+        
+        // when a push triggers a capacity resize, a pop immediately after
+        // doesn't trigger a capacity downsizing:
+        prevCapacity = sut.capacity
+        sut.push(10)
+        XCTAssertGreaterThan(sut.capacity, prevCapacity)
+        prevCapacity = sut._capacity
+        sut.popLast()
+        XCTAssertEqual(sut.capacity, prevCapacity)
     }
     
     // MARK: - removeLast(_:keepCapacity:) tests
@@ -599,10 +654,7 @@ final class CircularBufferTests: XCTestCase {
     func testRemoveLast_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(contentsOf: 5...10)
-        for _ in 5...10 {
-            sut.popLast()
-        }
+        sut.reserveCapacity(5)
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -694,10 +746,7 @@ final class CircularBufferTests: XCTestCase {
     func testRemoveAt_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
         whenFull()
         let expectedCapacity = sut._capacity
-        sut.append(contentsOf: 5...10)
-        for _ in 5...10 {
-            sut.popLast()
-        }
+        sut.reserveCapacity(5)
         XCTAssertGreaterThan(sut._capacity, expectedCapacity)
         XCTAssertEqual(sut.count, expectedCapacity)
         
@@ -1310,6 +1359,7 @@ final class CircularBufferTests: XCTestCase {
         var accumulator = 0
         for _ in 1...outerCount {
             var array = Array<Int>()
+            array.reserveCapacity(innerCount)
             for i in 1...innerCount {
                 array.append(i)
                 accumulator ^= (array.last ?? 0)
@@ -1346,6 +1396,7 @@ final class CircularBufferTests: XCTestCase {
         var accumulator = 0
         for _ in 1...outerCount {
             var array = Array<Int>()
+            array.reserveCapacity(innerCount)
             for i in 1...innerCount {
                 array.append(i)
                 accumulator ^= (array.last ?? 0)

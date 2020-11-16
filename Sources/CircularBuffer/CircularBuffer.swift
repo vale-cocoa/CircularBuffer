@@ -625,8 +625,9 @@ extension CircularBuffer {
     /// Removes and returns –if present– the first element in the storage.
     ///
     /// - Returns: the first element of type `Element` of the storage; `nil` when `isEmpty` is `true`.
-    /// - Complexity: O(1)
-    /// - Note: the capacity of the buffer is not affected by this operation.
+    /// - Complexity: amortized O(1)
+    /// - Note: the capacity of the buffer might get downsized after the operation has removed a stored element, and
+    ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
     @discardableResult
     public func popFirst() -> Element? {
         guard !self.isEmpty else { return nil }
@@ -634,6 +635,7 @@ extension CircularBuffer {
         let element = _elements.advanced(by: _head).move()
         _head = incrementIndex(_head)
         _elementsCount -= 1
+        _reduceCapacityForCurrentElementsCount()
         
         return element
     }
@@ -641,8 +643,9 @@ extension CircularBuffer {
     /// Removes and returns –if present– the last element in the storage.
     ///
     /// - Returns: the flast element of type `Element` of the storage; `nil` when `isEmpty` is `true`.
-    /// - Complexity: O(1)
-    /// - Note: the capacity of the buffer is not affected by this operation.
+    /// - Complexity: amortized O(1)
+    /// - Note: the capacity of the buffer might get downsized after the operation has removed a stored element, and
+    ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
     @discardableResult
     public func popLast() -> Element? {
         guard !self.isEmpty else { return nil }
@@ -650,6 +653,7 @@ extension CircularBuffer {
         _tail = decrementIndex(_tail)
         let element = _elements.advanced(by: _tail).move()
         _elementsCount -= 1
+        _reduceCapacityForCurrentElementsCount()
         
         return element
     }
@@ -1114,15 +1118,16 @@ extension CircularBuffer {
     
     @inline(__always)
     private func _reduceCapacityForCurrentElementsCount() {
+        guard
+            _capacity > Self._minCapacity,
+            (_capacity >> 2) >= _elementsCount
+        else { return }
+        
         guard !isEmpty else {
-            if _capacity > Self._minCapacity {
-                _fastResizeElements(to: Self._minCapacity)
-            }
+            _fastResizeElements(to: Self._minCapacity)
             
             return
         }
-        
-        guard _capacity >= Self._minCapacity << 2 else { return }
         
         let newCapacity = Self._convenientCapacityFor(capacity: _elementsCount)
         if newCapacity <= _capacity >> 2 {
