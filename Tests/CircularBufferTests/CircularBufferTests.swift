@@ -756,6 +756,31 @@ final class CircularBufferTests: XCTestCase {
         }
     }
     
+    // MARK: - removeAll(keepCapacity:) tests
+    func testRemoveAll_whenEmpty_thenReturnsEmptyArrayAndKeepsOrReducesCapacityAccordingly() {
+        sut.reserveCapacity(10)
+        let prevCapacity = sut._capacity
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut.removeAll(keepCapacity: true), [])
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        sut.removeAll(keepCapacity: false)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+    }
+    
+    func testRemoveAll_whenNotEmpty_thenReturnsContainedElementsAndKeepsOrReducesCapacityAccordingly() {
+        let expectedResult = Array(1...24)
+        sut = CircularBuffer(elements: expectedResult)
+        var prevCapacity = sut.capacity
+        XCTAssertEqual(sut.removeAll(keepCapacity: true), expectedResult)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        sut = CircularBuffer(elements: expectedResult)
+        prevCapacity = sut.capacity
+        sut.removeAll(keepCapacity: false)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+    }
+    
     // MARK: - prepend(contentsOf:) tests
     func testPrependContentsOf_whenNewElementsIsEmpty_doesNothing() {
         sut.prepend(contentsOf: [])
