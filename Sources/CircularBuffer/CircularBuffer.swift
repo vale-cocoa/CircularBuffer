@@ -51,10 +51,10 @@ public final class CircularBuffer<Element> {
     /// Returns a new empty `CircularBuffer` instance, initialized with a capacity value which can hold the
     /// given number of elements.
     ///
-    /// - Parameter capacity: the number of elements this instance can hold. Must be greater than or equal to zero.
-    /// - Note: when given a `capacity` value of `0`, the returned instance will be initialized to the minimum capacity
-    ///         level. In general the returned instance might have a bigger capacity level than the given one, due to
-    ///         internal optimizations.
+    /// - Parameter capacity: The number of elements this instance can hold. Must be greater than or equal to zero.
+    /// - Note: When given a `capacity` value of `0`, the returned instance will be initialized to the minimum
+    ///         capacity level. In general the returned instance might have a bigger capacity level than
+    ///         the given one, due to internal optimizations.
     public init(capacity: Int) {
         let nCapacity = Self._convenientCapacityFor(capacity: capacity)
         self._elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
@@ -66,10 +66,10 @@ public final class CircularBuffer<Element> {
     
     /// Returns a new `CircularBuffer` instance initialized to contain the same element for the given number of times.
     ///
-    /// - Parameter repeating: the element to store repeatedly.
-    /// - Parameter count:  the number of times to repeat the given element in the storage. Must be greater than
+    /// - Parameter repeating: The element to store repeatedly.
+    /// - Parameter count:  The number of times to repeat the given element in the storage. Must be greater than
     ///                     or equal to zero
-    /// - Note: if `count` is zero, returns an empty instance.
+    /// - Note: If `count` is zero, returns an empty instance.
     public init(repeating repeated: Element, count: Int) {
         precondition(count >= 0)
         let nCapacity = Self._convenientCapacityFor(capacity: count)
@@ -87,8 +87,8 @@ public final class CircularBuffer<Element> {
     /// Returns a new `CircularBuffer` instance initialized to contain the same elements of the given sequence,
     /// in the same order.
     ///
-    /// - Parameter elements: a sequence of elements to store.
-    /// - Note: when given an empty sequence, it returns an empty instance.
+    /// - Parameter elements: A sequence of elements to store.
+    /// - Note: When given an empty sequence, it returns an empty instance.
     public init<S: Sequence>(elements: S) where Element == S.Iterator.Element {
         var capacity: Int!
         var buffer: UnsafeMutablePointer<Element>!
@@ -291,7 +291,7 @@ extension CircularBuffer {
     /// print("buffer[1]")
     /// // prints "10"
     /// ```
-    /// - Parameter position:   an `Int` value representing the `index` of the element to access.
+    /// - Parameter position:   An `Int` value representing the `index` of the element to access.
     ///                         The range of possible indexes is zero-based —i.e. first element stored is
     ///                         at index 0. Must be greater than or equal `0` and less than `count` value
     ///                         of the instance.
@@ -346,8 +346,8 @@ extension CircularBuffer {
     /// Returns a copy of the `CircularBuffer` instance, eventually with increased capacity, containing a copy of the
     ///  same elements stored in the calee in the same order.
     ///
-    /// - Parameter additionalCapacity: additional capacity to add to the copy. Must be greater than or equal
-    ///                                 to zero. Defaults to zero.
+    /// - Parameter additionalCapacity: Additional capacity to add to the copy. **Must not be negative**.
+    ///                                 Defaults to zero.
     public func copy(additionalCapacity: Int = 0) -> CircularBuffer {
         let newCapacity = additionalCapacity > 0 ? Self._convenientCapacityFor(capacity: _capacity + additionalCapacity) : _capacity
         let copy = CircularBuffer(capacity: newCapacity)
@@ -363,10 +363,10 @@ extension CircularBuffer {
     }
     
     // MARK: - reserveCapacity(_:)
-    /// Allocate more space in the underlying buffer to hold actual elements count plus the addtional number in the
-    /// request.
+    /// Reserve enough memory in the underlaying buffer (evvuatually reallocating) so that it has enough free
+    /// spots for new elements at least equal to the specified value.
     ///
-    /// - Parameter _: the number of minimum free slots the buffer should have. Must be positive.
+    /// - Parameter _: The number of minimum free slots the buffer should have. **Must not be negative**.
     public func reserveCapacity(_ minimumCapacity: Int) {
         precondition(minimumCapacity >= 0)
         guard
@@ -385,9 +385,9 @@ extension CircularBuffer {
     // MARK: - Appending
     /// Stores the given element at the last position of the storage.
     ///
-    /// - Parameter _: the element to store.
-    /// - Complexity: amortized O(1).
-    /// - Note: when `isFull` is `true`, grows the capacity of the storage so it can hold the new count of elements.
+    /// - Parameter _: The element to store.
+    /// - Complexity: Amortized O(1).
+    /// - Note: When `isFull` is `true`, grows the capacity of the storage so it can hold the new count of elements.
     public func append(_ newElement: Element) {
         if isFull {
             _growToNextCapacityLevel()
@@ -399,8 +399,8 @@ extension CircularBuffer {
     
     /// Stores the given sequence of elements starting at the last position of the storage.
     ///
-    /// - Parameter contentsOf: a sequence of elements to append.
-    /// - Note: calls iteratively `append(:_)` for each element of the given sequence.
+    /// - Parameter contentsOf: A sequence of elements to append.
+    /// - Note: Calls iteratively `append(:_)` for each element of the given sequence.
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
     ///         value is the closest to the real count of elements of the sequence.
@@ -453,9 +453,9 @@ extension CircularBuffer {
     // MARK: - Prepending
     /// Stores given element at the first position of the storage.
     ///
-    /// - Parameter _: the element to store.
-    /// - Complexity: amortized O(1)
-    /// - Note: when `isFull` is `true`, grows the capacity of the storage so it can hold the new count of elements.
+    /// - Parameter _: The element to store.
+    /// - Complexity: Amortized O(1)
+    /// - Note: When `isFull` is `true`, grows the capacity of the storage so it can hold the new count of elements.
     public func push(_ newElement: Element) {
         if isFull {
             _growToNextCapacityLevel()
@@ -475,8 +475,8 @@ extension CircularBuffer {
     /// buffer.push(contentsOf: sequence)
     /// // buffer's storage: [3, 2, 1]
     /// ```
-    /// - Parameter contentsOf: a sequence of elements to push.
-    /// - Note: calls iteratively `push(:_)` for each element of the given sequence.
+    /// - Parameter contentsOf: A sequence of elements to push.
+    /// - Note: Calls iteratively `push(:_)` for each element of the given sequence.
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
     ///         value is the closest to the real count of elements of the sequence.
@@ -517,7 +517,7 @@ extension CircularBuffer {
     /// buffer.prepend(contentsOf: newElements)
     /// // buffer's storage: [1, 2, 3]
     /// ```
-    /// - Parameter contentsOf: a collection of `Element` instances to store at the top of the storage.
+    /// - Parameter contentsOf: A collection of `Element` instances to store at the top of the storage.
     public func prepend<C: Collection>(contentsOf newElements: C) where C.Iterator.Element == Element {
         guard newElements.count > 0 else { return }
         
@@ -552,14 +552,14 @@ extension CircularBuffer {
     /// buffer.insertAt(idx: 1, contentsOf: newElements)
     /// // buffer's storage: [4, 1, 2, 3, 5, 6]
     /// ```
-    /// - Parameter index:  an `Int` value representing the index where to start inserting the given
+    /// - Parameter index:  An `Int` value representing the index where to start inserting the given
     ///                     collection of elements.
     ///                     Must be greater than or equal zero and less than or equal `count`.
     ///                     When specifying zero as `index` the operation is same as in
     ///                     `prepend(contentsOf:)`;
     ///                     on the other hand when `index` has a value equal to`count`,
     ///                     the operation is the same as in `append(contentsOf:)`.
-    /// - Parameter contentsOf: a collection of `Element` instances to insert in the buffer starting from given
+    /// - Parameter contentsOf: A collection of `Element` instances to insert in the buffer starting from given
     ///                         `index` parameter.
     public func insertAt<C: Collection>(index: Int, contentsOf newElements: C) where C.Iterator.Element == Element {
         precondition(index >= 0 && index <= _elementsCount)
@@ -622,9 +622,9 @@ extension CircularBuffer {
 extension CircularBuffer {
     /// Removes and returns –if present– the first element in the storage.
     ///
-    /// - Returns: the first element of the storage; `nil` when `isEmpty` is `true`.
-    /// - Complexity: amortized O(1)
-    /// - Note: the capacity of the buffer might get downsized after the operation has removed a stored element, and
+    /// - Returns: The first element of the storage; `nil` when `isEmpty` is `true`.
+    /// - Complexity: Amortized O(1)
+    /// - Note: The capacity of the buffer might get downsized after the operation has removed a stored element, and
     ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
     @discardableResult
     public func popFirst() -> Element? {
@@ -640,9 +640,9 @@ extension CircularBuffer {
     
     /// Removes and returns –if present– the last element in the storage.
     ///
-    /// - Returns: the flast element of the storage; `nil` when `isEmpty` is `true`.
-    /// - Complexity: amortized O(1)
-    /// - Note: the capacity of the buffer might get downsized after the operation has removed a stored element, and
+    /// - Returns: The last element of the storage; `nil` when `isEmpty` is `true`.
+    /// - Complexity: Amortized O(1)
+    /// - Note: The capacity of the buffer might get downsized after the operation has removed a stored element, and
     ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
     @discardableResult
     public func popLast() -> Element? {
@@ -659,16 +659,16 @@ extension CircularBuffer {
     /// Removes and returns first *k* number of elements from the storage. Eventually reduces the buffer capacity when
     /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
     ///
-    /// - Parameter _:  an `Int` value representing the *k* number of elements to remove from the
+    /// - Parameter _:  An `Int` value representing the *k* number of elements to remove from the
     ///                 head of the storage.
     ///                 Must be greater than or equal to `0`, and less than or equal `count` value.
-    /// - Parameter keepCapacity:   boolean value, when `true` is specified then
+    /// - Parameter keepCapacity:   Boolean value, when `true` is specified then
     ///                             the storage capacity gets eventually reduced at the end of removal; otherwise
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
-    /// - Returns: an `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Returns: An `Array` containing the removed elements, in the same order as they were inside the storage.
+    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with a value equals to `count` as *k* elements to remove,
     ///         and `true` as `keepCapacity` value, all elements will be removed from the storage,
@@ -712,16 +712,16 @@ extension CircularBuffer {
     /// Removes and returns last *k* number of elements from the storage. Eventually reduces the buffer capacity when
     /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
     ///
-    /// - Parameter _:  an `Int` value representing the *k* number of elements to remove from the tail
+    /// - Parameter _:  An `Int` value representing the *k* number of elements to remove from the tail
     ///                 of the storage.
     ///                 Must be greater than or equal to `0`, and less than or equal `count` value.
-    /// - Parameter keepCapacity:   boolean value, when `true` is specified then
+    /// - Parameter keepCapacity:   Boolean value, when `true` is specified then
     ///                             the storage capacity gets eventually reduced at the end of removal; otherwise
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
-    /// - Returns: an `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Returns: An `Array` containing the removed elements, in the same order as they were inside the storage.
+    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with a value equals to `count` as *k* elements to remove,
     ///         and `true` as `keepCapacity` value, all elements will be removed from the storage,
@@ -764,21 +764,21 @@ extension CircularBuffer {
     /// parameter. Eventually reduces the buffer capacity when specified in the callee by giving a value of `true` as
     /// `keepCapacity` parameter value.
     ///
-    /// - Parameter index:  an `Int` value representing the position where to start the removal.
+    /// - Parameter index:  An `Int` value representing the position where to start the removal.
     ///                     Must be a valid subscript index: hence greater than or equal `zero`
     ///                     and less than `count` when `isEmpty` is false.
-    /// - Parameter count:  an `Int` value representing the *k* number of elements to remove
+    /// - Parameter count:  An `Int` value representing the *k* number of elements to remove
     ///                     starting from the given `index` position.
     ///                     Must be greater than or equal `0`, less than or equal to the count of elements
     ///                     between the given `index` position and the end postion of the storage
     ///                     (`count - index`).
-    /// - Parameter keepCapacity:   boolean value, when `true` is specified then
+    /// - Parameter keepCapacity:   Boolean value, when `true` is specified then
     ///                             the storage capacity gets eventually reduced at the end of removal; otherwise
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
-    /// - Returns:  an `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Returns:  An `Array` containing the removed elements, in the same order as they were inside the storage.
+    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with an `index` value of `0`,
     ///         a value equals to `count` as *k* elements to remove, and `true` as `keepCapacity` value,
@@ -885,12 +885,12 @@ extension CircularBuffer {
     /// Eventually reduces the buffer capacity when specified in the callee by giving a value of `true` as
     /// `keepCapacity` parameter value.
     ///
-    /// - Parameter keepCapacity:   boolean value, when `true` is specified then
+    /// - Parameter keepCapacity:   Boolean value, when `true` is specified then
     ///                             the storage capacity gets eventually reduced at the end of removal; otherwise
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
-    /// - Returns:  an `Array` containing the removed elements, in the same order as they were
+    /// - Returns:  An `Array` containing the removed elements, in the same order as they were
     ///             stored inside the storage.
     @discardableResult
     public func removeAll(keepCapacity: Bool = true) -> [Element] {
@@ -927,53 +927,53 @@ extension CircularBuffer {
     /// reduce the `count` value in respect to the current buffer capacity.
     /// Increases the buffer capacity when the operation will result in a `count` value larger than actual buffer capacity.
     ///
-    /// When given `subRange.count` equals `0` –i.e. `0..<0`–, the given elements are inserted at the index
-    /// position represented by the `subRange.lowerBound` –i.e. for `0..<0` elements are prepended in the storage.
-    /// When given `subRange.count` is greater than `0` –i.e. `0..<2`–, but the given colletion of elements for
-    ///  replacement is empty, then elements at the indexes in `subRange` are removed.
-    /// - Parameter subrange:   a `Range<Int>`expression  representing the indexes of elements to replace.
+    /// When given `subrange.count` equals `0` –i.e. `0..<0`–, the given elements are inserted at the index
+    /// position represented by the `subrange.lowerBound` –i.e. for `0..<0` elements are prepended in the storage.
+    /// When given `subrange.count` is greater than `0` –i.e. `0..<2`–, but the given colletion of elements for
+    ///  replacement is empty, then elements at the indexes in `subrange` are removed.
+    /// - Parameter subrange:   A `Range<Int>`expression  representing the indexes of elements to replace.
     ///                         Must be in range of `0`...`count`.
-    /// - Parameter with:   a collection of `Element` to insert in the storage as replacement of those elements
-    ///                     stored at the given `subRange` indexes.
-    public func replace<C: Collection>(subRange: Range<Int>, with newElements: C) where C.Iterator.Element == Element {
-        precondition(subRange.lowerBound >= 0 && subRange.upperBound <= _elementsCount, "range of indexes out of bounds")
-        if subRange.count == 0 {
+    /// - Parameter with:   A collection of `Element` to insert in the storage as replacement of those elements
+    ///                     stored at the given `subrange` indexes.
+    public func replace<C: Collection>(subrange: Range<Int>, with newElements: C) where C.Iterator.Element == Element {
+        precondition(subrange.lowerBound >= 0 && subrange.upperBound <= _elementsCount, "range of indexes out of bounds")
+        if subrange.count == 0 {
             // It's an insertion
             guard !newElements.isEmpty else { return }
             
-            if subRange.lowerBound == 0 {
+            if subrange.lowerBound == 0 {
                 // newElements have to be prepended
                 prepend(contentsOf: newElements)
-            } else if subRange.lowerBound == _elementsCount {
+            } else if subrange.lowerBound == _elementsCount {
                 // newElements have to be appended
                 append(contentsOf: newElements)
             } else {
                 // newElements have to be inserted
-                insertAt(index: subRange.lowerBound, contentsOf: newElements)
+                insertAt(index: subrange.lowerBound, contentsOf: newElements)
             }
         } else {
             // subRange count is greater than zero…
             if newElements.isEmpty {
                 // …But the given colletion is empty.
                 // It's a delete operation involving the _elements at indexes in subRange
-                if subRange.lowerBound == 0 {
-                    removeFirst(subRange.count, keepCapacity: false)
-                } else if subRange.upperBound == _elementsCount {
-                    removeLast(subRange.count, keepCapacity: false)
+                if subrange.lowerBound == 0 {
+                    removeFirst(subrange.count, keepCapacity: false)
+                } else if subrange.upperBound == _elementsCount {
+                    removeLast(subrange.count, keepCapacity: false)
                 } else {
-                    removeAt(index: subRange.lowerBound, count: subRange.count, keepCapacity: false)
+                    removeAt(index: subrange.lowerBound, count: subrange.count, keepCapacity: false)
                 }
             } else {
                 // It's a replace operation!
-                let newCount = _elementsCount - subRange.count + newElements.count
+                let newCount = _elementsCount - subrange.count + newElements.count
                 let newCapacity = Self._convenientCapacityFor(capacity: newCount)
                 if newCapacity == _capacity {
                     // No resize is needed, operation has to be done in place
-                    let buffIdx = bufferIndex(from: subRange.lowerBound)
-                    let countOfElementsToShift = _elementsCount - subRange.lowerBound - subRange.count
+                    let buffIdx = bufferIndex(from: subrange.lowerBound)
+                    let countOfElementsToShift = _elementsCount - subrange.lowerBound - subrange.count
                     // Deinitialize the elements to remove obtaining the buffer index to
                     // the first element that eventually gets shifted:
-                    let bufIdxOfFirstElementToShift = _deinitializeElements(advancedToBufferIndex: buffIdx, count: subRange.count)
+                    let bufIdxOfFirstElementToShift = _deinitializeElements(advancedToBufferIndex: buffIdx, count: subrange.count)
                     
                     let lastBuffIdx: Int!
                     if countOfElementsToShift > 0 {
@@ -1001,15 +1001,15 @@ extension CircularBuffer {
                     _tail = incrementIndex(lastBuffIdx - 1)
                 } else {
                     // Resize is needed…
-                    let buffIdx = bufferIndex(from: subRange.lowerBound)
+                    let buffIdx = bufferIndex(from: subrange.lowerBound)
                     let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
                     
-                    let countOfFirstSplit = subRange.lowerBound
-                    let countOfSecondSplit = _elementsCount - countOfFirstSplit - subRange.count
+                    let countOfFirstSplit = subrange.lowerBound
+                    let countOfSecondSplit = _elementsCount - countOfFirstSplit - subrange.count
                     
                     // Deinitialize in _elements the replaced subrange and obtain the
                     // buffer index to second split of elements to move from _elements:
-                    let secondSplitStartBuffIdx = _deinitializeElements(advancedToBufferIndex: buffIdx, count: subRange.count)
+                    let secondSplitStartBuffIdx = _deinitializeElements(advancedToBufferIndex: buffIdx, count: subrange.count)
                     
                     // Now move everything in newBuff…
                     // Eventually the first split from _elements:

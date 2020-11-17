@@ -1030,7 +1030,7 @@ final class CircularBufferTests: XCTestCase {
     // MARK: - replace(subRange:with:) tests
     func test_replaceSubrange_whenBothSubrangeCountAndNewElementsCountAreZero_doesNothing() {
         var prevCount = sut.count
-        sut.replace(subRange: 0..<0, with: [])
+        sut.replace(subrange: 0..<0, with: [])
         XCTAssertEqual(sut.count, prevCount)
         
         whenFull()
@@ -1038,7 +1038,7 @@ final class CircularBufferTests: XCTestCase {
         let prevElements = containedElementsWhenFull()
         var result = [Int]()
         for i in 0...sut.count {
-            sut.replace(subRange: i..<i, with: [])
+            sut.replace(subrange: i..<i, with: [])
             XCTAssertEqual(sut.count, prevCount)
             result = sutContainedElements()
             XCTAssertEqual(result, prevElements)
@@ -1054,7 +1054,7 @@ final class CircularBufferTests: XCTestCase {
         var prevCount = sut.count
         var result = [Int]()
         let newElements = [5, 6, 7, 8]
-        sut.replace(subRange: 0..<0, with: newElements)
+        sut.replace(subrange: 0..<0, with: newElements)
         XCTAssertEqual(sut.count, prevCount + newElements.count)
         result = sutContainedElements()
         XCTAssertEqual(result, newElements)
@@ -1065,7 +1065,7 @@ final class CircularBufferTests: XCTestCase {
         result.removeAll()
         for i in 0...sut.count {
             let subrange = i..<i
-            sut.replace(subRange: subrange, with: newElements)
+            sut.replace(subrange: subrange, with: newElements)
             result = sutContainedElements()
             XCTAssertEqual(result.count, prevCount + newElements.count)
             let expectedResult = Array(previousElements[0..<subrange.lowerBound]) + newElements + Array(previousElements[subrange.lowerBound..<previousElements.count])
@@ -1088,7 +1088,7 @@ final class CircularBufferTests: XCTestCase {
                 let subrange = startIdx..<endIdx
                 XCTAssertGreaterThan(subrange.count, 0)
                 
-                sut.replace(subRange: subrange, with: [])
+                sut.replace(subrange: subrange, with: [])
                 XCTAssertEqual(sut.count, prevCount - subrange.count)
                 result = sutContainedElements()
                 let expectedResult = Array(prevElements[0..<startIdx]) + Array(prevElements[endIdx..<prevElements.endIndex])
@@ -1112,7 +1112,7 @@ final class CircularBufferTests: XCTestCase {
                 let subrange = startIdx..<endIdx
                 XCTAssertGreaterThan(subrange.count, 0)
                 
-                sut.replace(subRange: subrange, with: newElements)
+                sut.replace(subrange: subrange, with: newElements)
                 result = sutContainedElements()
                 var expectedResult = prevElements
                 expectedResult.replaceSubrange(subrange, with: newElements)
@@ -1139,7 +1139,7 @@ final class CircularBufferTests: XCTestCase {
         expectedResult.replaceSubrange(subrange, with: newElements)
         XCTAssertEqual(expectedResult, [1, 2, 3, 4, 5, 6, 7 ,8])
         
-        sut.replace(subRange: subrange, with: newElements)
+        sut.replace(subrange: subrange, with: newElements)
         XCTAssertEqual(sut._capacity, prevCapacity)
         XCTAssertEqual(sut.count, prevCount - subrange.count + newElements.count)
         let result = sutContainedElements()
