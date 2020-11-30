@@ -781,6 +781,88 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertLessThan(sut.capacity, prevCapacity)
     }
     
+    // MARK: - popFirstSwappedWithElement(at:) tests
+    func testPopFirstSwappedWithElementAt() {
+        // when just one element is stored, then it gets popped:
+        sut = CircularBuffer(elements: [10])
+        XCTAssertEqual(sut.popFirstSwappedWithElement(at: 0), 10)
+        XCTAssertTrue(sut.isEmpty)
+        
+        // when is full and index is greater than 0, then element at given index
+        // gets removed and returned, first element is swapped to that position:
+        var expectedResult = containedElementsWhenFull()
+        whenFull()
+        let countWhenFull = sut.count
+        for index in 1..<countWhenFull {
+            expectedResult.swapAt(0, index)
+            expectedResult.remove(at: 0)
+            let expectedElement = sut[index]
+            
+            XCTAssertEqual(sut.popFirstSwappedWithElement(at: index), expectedElement)
+            XCTAssertEqual(sutContainedElements(), expectedResult)
+            
+            // let's restore state for next test iteration
+            whenFull()
+            expectedResult = containedElementsWhenFull()
+        }
+        
+        // Let's also do this test when elements are wrapping around in the storage:
+        let elements = [1, 2, 3, 4]
+        for headShift in 1..<elements.count {
+            for index in 0..<elements.count {
+                var expectedResult = elements
+                expectedResult.swapAt(0, index)
+                let expectedElement = expectedResult.remove(at: 0)
+                sut = CircularBuffer._headShiftedInstance(contentsOf: elements, headShift: headShift)
+                
+                XCTAssertGreaterThan(sut._head + sut._elementsCount, sut._capacity)
+                XCTAssertEqual(sut.popFirstSwappedWithElement(at: index), expectedElement)
+                XCTAssertEqual(sutContainedElements(), expectedResult)
+            }
+            
+        }
+    }
+    
+    // MARK: - popLastSwappedWithElement(at:) tests
+    func testPopLastSwappedWithElementAt() {
+        // when just one element is stored, then it gets popped:
+        sut = CircularBuffer(elements: [10])
+        XCTAssertEqual(sut.popLastSwappedWithElement(at: 0), 10)
+        XCTAssertTrue(sut.isEmpty)
+        
+        // when is full and index is greater than 0, then element at given index
+        // gets removed and returned, last element is swapped to that position:
+        var expectedResult = containedElementsWhenFull()
+        whenFull()
+        let countWhenFull = sut.count
+        for index in 1..<countWhenFull {
+            expectedResult.swapAt(expectedResult.endIndex - 1, index)
+            let expectedElement = expectedResult.popLast()
+            
+            XCTAssertEqual(sut.popLastSwappedWithElement(at: index), expectedElement)
+            XCTAssertEqual(sutContainedElements(), expectedResult)
+            
+            // let's restore state for next test iteration
+            whenFull()
+            expectedResult = containedElementsWhenFull()
+        }
+        
+        // Let's also do this test when elements are wrapping around in the storage:
+        let elements = [1, 2, 3, 4]
+        for headShift in 1..<elements.count {
+            for index in 0..<elements.count {
+                var expectedResult = elements
+                expectedResult.swapAt(elements.endIndex - 1, index)
+                let expectedElement = expectedResult.popLast()
+                sut = CircularBuffer._headShiftedInstance(contentsOf: elements, headShift: headShift)
+                
+                XCTAssertGreaterThan(sut._head + sut._elementsCount, sut._capacity)
+                XCTAssertEqual(sut.popLastSwappedWithElement(at: index), expectedElement)
+                XCTAssertEqual(sutContainedElements(), expectedResult)
+            }
+        }
+    }
+    
     // MARK: - prepend(contentsOf:) tests
     func testPrependContentsOf_whenNewElementsIsEmpty_doesNothing() {
         sut.prepend(contentsOf: [])

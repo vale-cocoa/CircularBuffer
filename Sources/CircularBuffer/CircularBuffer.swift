@@ -918,6 +918,56 @@ extension CircularBuffer {
         return result
     }
     
+    /// Swaps element currently stored at first index position, with the one stored at the specified index, then pops
+    /// the new first element.
+    ///
+    /// - Parameter at: An `Int` value representing the index of the element to pop.
+    ///                 **Must be a valid subscript index**, hence greater than or equal `zero`
+    ///                 and less than `count` when `isEmpty` is false.
+    /// - Returns: The element stored at the specified `index` parameter.
+    /// - Complexity: Amortized O(1).
+    /// - Note: When specifiying `0` as `index`, no swap occurs hence it would be
+    ///         the same as doing `popFirst()!` operation.
+    @discardableResult
+    public func popFirstSwappedWithElement(at index: Int) -> Element {
+        _checkSubscriptBounds(for: index)
+        guard index != 0 else { return popFirst()! }
+        
+        let buffIdx = bufferIndex(from: index)
+        let result = _elements.advanced(by: buffIdx).move()
+        _elements.advanced(by: buffIdx).moveInitialize(from: _elements.advanced(by: _head), count: 1)
+        _head = incrementIndex(_head)
+        _elementsCount -= 1
+        _reduceCapacityForCurrentElementsCount()
+        
+        return result
+    }
+    
+    /// Swaps element currently stored at last index position, with the one stored at the specified index, then pops
+    /// the new last element.
+    ///
+    /// - Parameter at: An `Int` value representing the index of the element to pop.
+    ///                 **Must be a valid subscript index**, hence greater than or equal `zero`
+    ///                 and less than `count` when `isEmpty` is false.
+    /// - Returns: The element stored at the specified `index` parameter.
+    /// - Complexity: Amortized O(1).
+    /// - Note: When specifiying a value of `count - 1` as `index`, no swap occurs hence it would be
+    ///         the same as doing `popLast()!` operation.
+    @discardableResult
+    public func popLastSwappedWithElement(at index: Int) -> Element {
+        _checkSubscriptBounds(for: index)
+        guard index != _elementsCount - 1 else { return popLast()! }
+        
+        let buffIdx = bufferIndex(from: index)
+        _tail = decrementIndex(_tail)
+        let result = _elements.advanced(by: buffIdx).move()
+        _elements.advanced(by: buffIdx).moveInitialize(from: _elements.advanced(by: _tail), count: 1)
+        _elementsCount -= 1
+        _reduceCapacityForCurrentElementsCount()
+        
+        return result
+    }
+    
 }
 
 // MARK: - Replace elements
@@ -1308,3 +1358,18 @@ extension UnsafeMutablePointer {
     
 }
 
+// MARK: - Specific interface for tests only
+#if DEBUG
+extension CircularBuffer {
+    static func _headShiftedInstance(contentsOf elements: [Element], headShift: Int) -> CircularBuffer {
+        precondition(headShift > 0, "Head shift must be greater than 0")
+        let minCapacity = headShift >= elements.count ? _convenientCapacityFor(capacity: elements.count + 1) : _convenientCapacityFor(capacity: elements.count)
+        let result = CircularBuffer(capacity: minCapacity)
+        result._head = headShift
+        result._tail = headShift
+        result.append(contentsOf: elements)
+        
+        return result
+    }
+}
+#endif
