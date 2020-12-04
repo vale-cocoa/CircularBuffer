@@ -20,24 +20,17 @@
 
 // MARK: - Remove elements
 extension CircularBuffer {
-    /// Removes and returns –if present– the first element in the storage.
+    /// Removes and returns —if present— the element stored at first position storage.
+    /// Eventually reduces capacity if necessary by adopting the smart capacity policy.
     ///
     /// - Returns: The first element of the storage; `nil` when `isEmpty` is `true`.
     /// - Complexity: Amortized O(1)
     /// - Note: The capacity of the buffer might get downsized after the operation has removed a stored element, and
-    ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
+    ///         will get downsized to the minimum value if after the removal operation the buffer will be empty.
     @discardableResult
     public func popFirst() -> Element? {
         guard !self.isEmpty else { return nil }
         
-        /*
-        let element = _elements.advanced(by: head).move()
-        head = incrementIndex(head)
-        count -= 1
-        _reduceSmartCapacityForCurrentElementsCount()
-        
-        return element
-        */
         defer {
             reduceSmartCapacityForCurrentElementsCount()
         }
@@ -49,12 +42,30 @@ extension CircularBuffer {
         return element
     }
     
-    /// Removes and returns –if present– the last element in the storage.
+    /// Removes and returns —if present— the element stored at first position, keeping the capacity intact.
+    ///
+    /// - Returns: `first` element.
+    /// - Complexity: O(1)
+    @discardableResult
+    func popFront() -> Element? {
+        guard !isEmpty else { return nil }
+        
+        let firstElement = elements.advanced(by: head).move()
+        defer {
+            head = incrementIndex(head)
+            count -= 1
+        }
+        
+        return firstElement
+    }
+    
+    /// Removes and returns —if present— the element stored at last position storage.
+    /// Eventually reduces capacity if necessary by adopting the smart capacity policy.
     ///
     /// - Returns: The last element of the storage; `nil` when `isEmpty` is `true`.
     /// - Complexity: Amortized O(1)
     /// - Note: The capacity of the buffer might get downsized after the operation has removed a stored element, and
-    ///         will get downsized to the minimum value when after the removal operation the buffer will be empty.
+    ///         will get downsized to the minimum value if after the removal operation the buffer will be empty.
     @discardableResult
     public func popLast() -> Element? {
         guard !self.isEmpty else { return nil }
@@ -65,6 +76,21 @@ extension CircularBuffer {
         reduceSmartCapacityForCurrentElementsCount()
         
         return element
+    }
+    
+    /// Removes and returns —if present— the element stored at last position, keeping the capacity intact.
+    ///
+    /// - Returns: `last` element.
+    /// - Complexity: O(1)
+    @discardableResult
+    public func popBack() -> Element? {
+        guard !isEmpty else { return nil }
+        
+        tail = decrementIndex(tail)
+        let lastElement = elements.advanced(by: tail).move()
+        count -= 1
+        
+        return lastElement
     }
     
     /// Removes and returns first *k* number of elements from the storage. Eventually reduces the buffer capacity when
@@ -102,7 +128,7 @@ extension CircularBuffer {
         }
         
         let removed = UnsafeMutablePointer<Element>.allocate(capacity: k)
-        moveInitialzeFromElements(advancedToBufferIndex: head, count: k, to: removed)
+        moveInitializeFromElements(advancedToBufferIndex: head, count: k, to: removed)
         
         defer {
             head = head + k > capacity ? incrementIndex(k - (capacity - head) - 1) : incrementIndex(head + k - 1)
@@ -154,7 +180,7 @@ extension CircularBuffer {
         
         let removed = UnsafeMutablePointer<Element>.allocate(capacity: k)
         let buffIdxStart = tail - k < 0 ? capacity - k - tail : tail - k
-        moveInitialzeFromElements(advancedToBufferIndex: buffIdxStart, count: k, to: removed)
+        moveInitializeFromElements(advancedToBufferIndex: buffIdxStart, count: k, to: removed)
         
         defer {
             count -= k
@@ -220,7 +246,7 @@ extension CircularBuffer {
         
         // move elements to remove, obtaining the buffer index from where some elements
         // might remain:
-        let bufIdxOfSecondSplit = moveInitialzeFromElements(advancedToBufferIndex: buffIdx, count: k, to: removed)
+        let bufIdxOfSecondSplit = moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: k, to: removed)
         
         // We defer the shifting of remaining elements/rejoining in a smaller buffer
         // operation after we have returned the removed elements
@@ -239,12 +265,12 @@ extension CircularBuffer {
                 
                 // move into newBuff first split of _elements
                 if countOfFirstSplit > 0 {
-                    moveInitialzeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuff)
+                    moveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuff)
                 }
                 
                 // move into newBuff second split of _elements
                 if countOfSecondSplit > 0 {
-                    moveInitialzeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfSecondSplit, to: newBuff.advanced(by: countOfFirstSplit))
+                    moveInitializeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfSecondSplit, to: newBuff.advanced(by: countOfFirstSplit))
                 }
                 
                 // Apply the change of buffer:
@@ -267,7 +293,7 @@ extension CircularBuffer {
                     // below the removed ones.
                     // Let's first move them out _elements:
                     let swap = UnsafeMutablePointer<Element>.allocate(capacity: countOfElementsToShift)
-                    moveInitialzeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfElementsToShift, to: swap)
+                    moveInitializeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfElementsToShift, to: swap)
                     
                     // then back in _elements at the index where the removal started,
                     // obtaining also the buffer index for recalculating the _tail:
@@ -318,7 +344,7 @@ extension CircularBuffer {
         guard count > 0 else { return [] }
         
         let removed = UnsafeMutablePointer<Element>.allocate(capacity: count)
-        moveInitialzeFromElements(advancedToBufferIndex: head, count: count, to: removed)
+        moveInitializeFromElements(advancedToBufferIndex: head, count: count, to: removed)
         let result = Array(UnsafeBufferPointer(start: removed, count: count))
         removed.deinitialize(count: count)
         removed.deallocate()

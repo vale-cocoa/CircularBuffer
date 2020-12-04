@@ -20,8 +20,9 @@
 
 // MARK: - Add new elements
 extension CircularBuffer {
-    // MARK: - Appending
-    /// Stores the given element at the last position of the storage.
+    // MARK: - Appending new elements
+    /// Stores the given element at the last position of the storage. Eventually grows the capacity of the storage when
+    /// `isFull` equals to `true`, adopting the smart capacity resizing policy.
     ///
     /// - Parameter _: The element to store.
     /// - Complexity: Amortized O(1).
@@ -35,14 +36,15 @@ extension CircularBuffer {
         count += 1
     }
     
-    /// Stores the given sequence of elements starting at the last position of the storage.
+    /// Stores the given sequence of elements starting at the last position of the storage. Eventually grows the capacity of
+    /// the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// - Parameter contentsOf: A sequence of elements to append.
     /// - Note: Calls iteratively `append(:_)` for each element of the given sequence.
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
     ///         value is the closest to the real count of elements of the sequence.
-    @inline(__always)
+    @inlinable
     public func append<S: Sequence>(contentsOf newElements: S) where S.Iterator.Element == Element {
         guard
             let _ = newElements
@@ -71,25 +73,77 @@ extension CircularBuffer {
         }
     }
     
-    @usableFromInline
-    internal func append<C: Collection>(contentsOf newElements: C) where C.Iterator.Element == Element {
-        guard newElements.count > 0 else { return }
+    /// Stores the specified new element at the last position of the storage.
+    /// In case `isFull` is `true`, it'll make room in the buffer by trumping the value stored at first position.
+    ///
+    /// - Parameter _: The new element to store at the last position of the storage.
+    /// - Complexity: O(1)
+    public func pushBack(_ newElement: Element) {
+        guard capacity > 0 else { return }
         
-        if count + newElements.count <= capacity
-        {
-            // actual buffer can hold all elements, thus append newElements in place
-            let finalBufIdx = initializeElements(advancedToBufferIndex: tail, from: newElements)
-            count += newElements.count
-            tail = incrementIndex(finalBufIdx - 1)
+        if isFull {
+            elements.advanced(by: tail).pointee = newElement
+            tail = incrementIndex(tail)
+            head = incrementIndex(head)
         } else {
-            // resize buffer to the right capacity and append newElements
-            let newCapacity = Self.smartCapacityFor(count: capacity + newElements.count)
-            fastResizeElements(to: newCapacity, insert: newElements, at: count)
+            elements.advanced(by: tail).initialize(to: newElement)
+            tail = incrementIndex(tail)
+            count += 1
         }
     }
     
-    // MARK: - Prepending
-    /// Stores given element at the first position of the storage.
+    /// Iteratively stores the elements contained in the specified sequence at the last position of the storage.
+    /// In case `isFull` is `true`, it'll make room in the buffer by trumping iteratively enough stored values starting
+    /// from first position.
+    ///
+    /// - Parameter contentsOf: The sequence of elements to store starting from the last position of the storage.
+    public func pushBack<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
+        guard capacity > 0 else { return }
+        
+        let done: Bool = newElements
+            .withContiguousStorageIfAvailable { buff -> Bool in
+                let addedCount = buff.count
+                guard
+                    buff.baseAddress != nil,
+                    addedCount > 0
+                else { return true }
+                
+                guard
+                    addedCount > self.residualCapacity
+                else {
+                    self.fastAppend(buff)
+                    
+                    return true
+                }
+                
+                if addedCount > self.capacity {
+                    let slice = buff[(buff.endIndex - self.capacity)..<buff.endIndex]
+                    self.deinitializeElements(advancedToBufferIndex: self.head, count: self.count)
+                    self.initializeElements(advancedToBufferIndex: 0, from: slice)
+                    self.head = 0
+                    self.tail = 0
+                } else {
+                    let countToDeinitialize = addedCount - self.residualCapacity >= self.count ? self.count : addedCount - self.residualCapacity
+                    let newHead = self.deinitializeElements(advancedToBufferIndex: self.head, count: countToDeinitialize)
+                    self.initializeElements(advancedToBufferIndex: self.tail, from: buff)
+                    self.head = newHead
+                    self.tail = self.head
+                }
+                self.count = self.capacity
+                
+                return true
+            } ?? false
+        
+        if !done {
+            for newElement in newElements {
+                pushBack(newElement)
+            }
+        }
+    }
+    
+    // MARK: - Prepending new elements
+    /// Stores given element at the first position of the storage. Eventually grows the capacity of the storage when
+    /// `isFull` equals to `true`, adopting the smart capacity resizing policy.
     ///
     /// - Parameter _: The element to store.
     /// - Complexity: Amortized O(1)
@@ -103,7 +157,8 @@ extension CircularBuffer {
         count += 1
     }
     
-    /// Stores the given sequence of elements at the first position of the storage.
+    /// Stores the given sequence of elements at the first position of the storage. Eventually grows the capacity of
+    /// the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// Since the sequence is iterated and at each iteration an element is pushed, the elements will appear in
     /// reversed order inside the `CircularBuffer`:
@@ -118,6 +173,7 @@ extension CircularBuffer {
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
     ///         value is the closest to the real count of elements of the sequence.
+    @inlinable
     public func push<S: Sequence>(contentsOf newElements: S) where S.Iterator.Element == Element {
         guard
             let _ = newElements
@@ -148,6 +204,7 @@ extension CircularBuffer {
     }
     
     /// Stores the given collection of elements at first position of the storage, mainteining their order.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// ```
     /// let newElements = [1, 2, 3]
@@ -177,8 +234,81 @@ extension CircularBuffer {
         }
     }
     
+    /// Stores the  specified new element at the first position of the storage.
+    /// In case `isFull` is `true`, it'll make room in the buffer by trumping the value stored at last position.
+    ///
+    /// - Parameter _: The new element to store at the first position of the storage.
+    /// - Complexity: O(1)
+    public func pushFront(_ newElement: Element) {
+        guard capacity > 0 else { return }
+        
+        head = decrementIndex(head)
+        if isFull {
+            elements.advanced(by: head).pointee = newElement
+            tail = decrementIndex(tail)
+        } else {
+            elements.advanced(by: head).initialize(to: newElement)
+            count += 1
+        }
+    }
+    
+    /// Iteratively pushes the elements contained in the specified sequence at the first position of the storage.
+    /// In case `isFull` is `true`, it'll make room in the buffer by trumping iteratively enough stored values starting
+    /// from last position.
+    ///
+    /// - Parameter contentsOf: The sequence of elements to push at the first position of the storage.
+    /// - Note: The new elements will appear in reverse order than the one they had in the sequence;
+    ///         that is this operation is equivalent to calling iteratively `pushFront(_:)`
+    ///         for each element in specified seqeunce.
+    public func pushFront<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
+        guard capacity > 0 else { return }
+        
+        let done: Bool = newElements
+            .withContiguousStorageIfAvailable { buff -> Bool in
+                let addedCount = buff.count
+                guard
+                    buff.baseAddress != nil,
+                    addedCount > 0
+                else { return true }
+                
+                guard
+                    addedCount > self.residualCapacity
+                else {
+                    self.fastPrepend(buff.reversed())
+                    
+                    return true
+                }
+                
+                if addedCount > self.capacity {
+                    let slice = buff[buff.endIndex - self.capacity..<buff.endIndex]
+                        .reversed()
+                    self.deinitializeElements(advancedToBufferIndex: self.head, count: self.count)
+                    self.initializeElements(advancedToBufferIndex: 0, from: slice)
+                    self.head = 0
+                    self.tail = 0
+                } else {
+                    let countToDeinitialize = addedCount - self.residualCapacity >= self.count ? self.count : addedCount - self.residualCapacity
+                    let newTail = self.bufferIndex(from: self.count - countToDeinitialize)
+                    self.deinitializeElements(advancedToBufferIndex: newTail, count: countToDeinitialize)
+                    self.tail = newTail
+                    self.initializeElements(advancedToBufferIndex: newTail, from: buff.reversed())
+                    self.head = newTail
+                }
+                self.count = self.capacity
+                
+                return true
+            } ?? false
+        
+        if !done {
+            for newElement in newElements {
+                pushFront(newElement)
+            }
+        }
+    }
+    
     // MARK: - Inserting
     /// Insert all elements in given collection starting from given index, keeping their original order.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// ```
     /// let newElements = [1, 2, 3]
@@ -232,7 +362,7 @@ extension CircularBuffer {
             // Temporarly move out elements that has to be shifted:
             let elementsToShiftCount = count - index
             let swap = UnsafeMutablePointer<Element>.allocate(capacity: elementsToShiftCount)
-            moveInitialzeFromElements(advancedToBufferIndex: buffIdx, count: elementsToShiftCount, to: swap)
+            moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: elementsToShiftCount, to: swap)
             
             // Copy newElements in place, obtaining the buffer index where the shifted
             // elements have to be moved back in:

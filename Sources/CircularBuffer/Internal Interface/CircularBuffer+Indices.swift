@@ -20,24 +20,24 @@
 
 extension CircularBuffer {
     @usableFromInline
-    func checkSubscriptBounds(for position: Int) {
+    internal func checkSubscriptBounds(for position: Int) {
         precondition(position >= 0 && position < count, "subscript index out of bounds")
     }
     
     @usableFromInline
-    func bufferIndex(from index: Int) -> Int {
+    internal func bufferIndex(from index: Int) -> Int {
         let advanced = head + index
         
         return advanced < capacity ? advanced : advanced - capacity
     }
     
     @usableFromInline
-    func incrementIndex(_ index: Int) -> Int {
+    internal func incrementIndex(_ index: Int) -> Int {
         index == capacity - 1 ? 0 : index + 1
     }
     
     @usableFromInline
-    func decrementIndex(_ index: Int) -> Int {
+    internal func decrementIndex(_ index: Int) -> Int {
         index == 0 ? capacity - 1 : index - 1
     }
     

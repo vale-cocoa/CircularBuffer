@@ -124,7 +124,7 @@ extension CircularBuffer {
                     let countToMove = topStart - oldNewHead
                     let temp = UnsafeMutablePointer<Element>.allocate(capacity: countToMove)
                     let oldNewHeadBuffIdx = bufferIndex(from: oldNewHead)
-                    moveInitialzeFromElements(advancedToBufferIndex: oldNewHeadBuffIdx, count: countToMove, to: temp)
+                    moveInitializeFromElements(advancedToBufferIndex: oldNewHeadBuffIdx, count: countToMove, to: temp)
                     let updatedNewHead = oldNewHead + countToDeinitialize
                     newHeadBuffIdx = bufferIndex(from: updatedNewHead)
                     newHead = updatedNewHead
@@ -158,7 +158,7 @@ extension CircularBuffer {
                     let countToMove = oldNewLast - bottomStart
                     let temp = UnsafeMutablePointer<Element>.allocate(capacity: countToMove)
                     let bottomStartBuffIdx = bufferIndex(from: bottomIdx + 1 + countToDeinitialize)
-                    moveInitialzeFromElements(advancedToBufferIndex: bottomStartBuffIdx, count: countToMove, to: temp)
+                    moveInitializeFromElements(advancedToBufferIndex: bottomStartBuffIdx, count: countToMove, to: temp)
                     let reInsertBuffIdx = incrementIndex(buffIdx)
                     moveInitializeToElements(advancedToBufferIndex: reInsertBuffIdx, from: temp, count: countToMove)
                     newLast = oldNewLast - countToDeinitialize

@@ -78,7 +78,7 @@ extension CircularBuffer {
                         // We've got some elements to shift in the process.
                         // Let's move them temporarly out:
                         let swap = UnsafeMutablePointer<Element>.allocate(capacity: countOfElementsToShift)
-                        moveInitialzeFromElements(advancedToBufferIndex: bufIdxOfFirstElementToShift, count: countOfElementsToShift, to: swap)
+                        moveInitializeFromElements(advancedToBufferIndex: bufIdxOfFirstElementToShift, count: countOfElementsToShift, to: swap)
                         
                         // Let's put newElements in place obtaining the buffer index
                         // where to put back the shifted elements:
@@ -113,7 +113,7 @@ extension CircularBuffer {
                     // Eventually the first split from _elements:
                     var newBuffIdx = 0
                     if countOfFirstSplit > 0 {
-                        moveInitialzeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuff)
+                        moveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuff)
                         newBuffIdx += countOfFirstSplit
                     }
                     
@@ -123,7 +123,7 @@ extension CircularBuffer {
                     
                     // Eventually the second split from _elements:
                     if countOfSecondSplit > 0 {
-                        moveInitialzeFromElements(advancedToBufferIndex: secondSplitStartBuffIdx, count: countOfSecondSplit, to: newBuff.advanced(by: newBuffIdx))
+                        moveInitializeFromElements(advancedToBufferIndex: secondSplitStartBuffIdx, count: countOfSecondSplit, to: newBuff.advanced(by: newBuffIdx))
                     }
                     
                     // deallocate and update _elements with newBuff:
