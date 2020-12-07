@@ -22,7 +22,7 @@
 extension CircularBuffer {
     // MARK: - Appending new elements
     /// Stores the given element at the last position of the storage. Eventually grows the capacity of the storage when
-    /// `isFull` equals to `true`, adopting the smart capacity resizing policy.
+    /// `isFull` equals to `true`, adopting the smart capacity policy.
     ///
     /// - Parameter _: The element to store.
     /// - Complexity: Amortized O(1).
@@ -41,7 +41,7 @@ extension CircularBuffer {
     ///
     /// - Parameter contentsOf: A sequence of elements to append. **Must be finite**.
     /// - Note: Calls iteratively `append(:_)` for each element of the given sequence.
-    ///         Capacity is grown when necessary to hold all new elements.
+    ///         Capacity is grown when necessary to hold all new elements, adopting the smart capacity policy.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
     ///         value is the closest to the real count of elements of the sequence.
     @inlinable
@@ -78,6 +78,7 @@ extension CircularBuffer {
     ///
     /// - Parameter _: The new element to store at the last position of the storage.
     /// - Complexity: O(1)
+    /// - Note: This method effectively uses the storage as a ring buffer.
     public func pushBack(_ newElement: Element) {
         guard capacity > 0 else { return }
         
@@ -98,6 +99,7 @@ extension CircularBuffer {
     ///
     /// - Parameter contentsOf: The sequence of elements to store starting from the last position of the storage.
     ///                         **Must be finite**.
+    /// - Note: This method effectively uses the storage as a ring buffer.
     public func pushBack<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
         guard capacity > 0 else { return }
         
@@ -144,7 +146,7 @@ extension CircularBuffer {
     
     // MARK: - Prepending new elements
     /// Stores given element at the first position of the storage. Eventually grows the capacity of the storage when
-    /// `isFull` equals to `true`, adopting the smart capacity resizing policy.
+    /// `isFull` equals to `true`, adopting the smart capacity policy.
     ///
     /// - Parameter _: The element to store.
     /// - Complexity: Amortized O(1)
@@ -158,8 +160,8 @@ extension CircularBuffer {
         count += 1
     }
     
-    /// Stores the given sequence of elements at the first position of the storage by iteratively pusshing them.
-    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
+    /// Stores the given sequence of elements at the first position of the storage by iteratively pushing them.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity policy.
     ///
     /// Since the sequence is iterated and at each iteration an element is pushed, the elements will appear in
     /// reversed order inside the `CircularBuffer`:
@@ -205,7 +207,7 @@ extension CircularBuffer {
     }
     
     /// Stores the given sequence of elements starting from first position of the storage, mainteining their order.
-    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity policy.
     ///
     /// ```
     /// let newElements = AnySequence([1, 2, 3])
@@ -237,6 +239,7 @@ extension CircularBuffer {
     ///
     /// - Parameter _: The new element to store at the first position of the storage.
     /// - Complexity: O(1)
+    /// - Note: This method effectively uses the storage as a ring buffer.
     public func pushFront(_ newElement: Element) {
         guard capacity > 0 else { return }
         
@@ -255,7 +258,8 @@ extension CircularBuffer {
     /// from last position.
     ///
     /// - Parameter contentsOf: The sequence of elements to push at the first position of the storage.
-    /// - Note: The new elements will appear in reverse order than the one they had in the sequence;
+    /// - Note: This method effectively uses the storage as a ring buffer.
+    ///         The new elements will appear in reverse order than the one they had in the sequence;
     ///         that is this operation is equivalent to calling iteratively `pushFront(_:)`
     ///         for each element in specified seqeunce.
     public func pushFront<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
@@ -307,7 +311,8 @@ extension CircularBuffer {
     
     // MARK: - Inserting
     /// Insert all elements in given collection starting from given index, keeping their original order.
-    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity policy
+    /// on the basis of the specified value for `usingSmartCapacityPolicy` parameter.
     ///
     /// ```
     /// let newElements = [1, 2, 3]
@@ -328,6 +333,13 @@ extension CircularBuffer {
     ///                     the operation is the same as in `append(contentsOf:)`.
     /// - Parameter contentsOf: A collection of `Element` instances to insert in the buffer starting from given
     ///                         `index` parameter.
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When set to `true`, the eventual resizing
+    ///                                         of the buffer `capacity` value is done by adopting
+    ///                                         the smart capacity policy.
+    ///                                         Otherwise, when set to `false`, the eventual resize of the
+    ///                                         buffer `capacity` value will match exctly the instance's
+    ///                                         `count` value after the insert operation.
+    ///                                         **Defaults to true**.
     @inlinable
     public func insertAt<C: Collection>(index: Int, contentsOf newElements: C,  usingSmartCapacityPolicy: Bool = true) where C.Iterator.Element == Element {
         precondition(index >= 0 && index <= count, "Index is out of bounds")

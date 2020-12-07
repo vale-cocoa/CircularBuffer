@@ -46,6 +46,7 @@ extension CircularBuffer {
     ///
     /// - Returns: `first` element.
     /// - Complexity: O(1)
+    /// - Note: This method effectively uses the storage as a ring buffer.
     @discardableResult
     func popFront() -> Element? {
         guard !isEmpty else { return nil }
@@ -82,6 +83,7 @@ extension CircularBuffer {
     ///
     /// - Returns: `last` element.
     /// - Complexity: O(1)
+    /// - Note: This method effectively uses the storage as a ring buffer.
     @discardableResult
     public func popBack() -> Element? {
         guard !isEmpty else { return nil }

@@ -38,6 +38,7 @@ final class CircularBufferTests: XCTestCase {
     
     // MARK: - Init tests
     func testInit() {
+        sut = CircularBuffer<Int>.init()
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.minSmartCapacity)
@@ -47,7 +48,7 @@ final class CircularBufferTests: XCTestCase {
     }
     
     func testInitCapacity_whenCapacityIsGreaterThanZero() {
-        sut = CircularBuffer<Int>(capacity: 1)
+        sut = CircularBuffer<Int>.init(capacity: 1)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertGreaterThan(sut.capacity, 0)
@@ -58,25 +59,25 @@ final class CircularBufferTests: XCTestCase {
     
     func testInitCapacity_whenMatchingExactlyIsFalse() {
         for i in 2..<5 {
-            sut = CircularBuffer<Int>(capacity: i, matchingExactly: false)
+            sut = CircularBuffer<Int>.init(capacity: i, matchingExactly: false)
             XCTAssertEqual(sut.capacity, 4)
             XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: i))
         }
         
         for i in 5..<9 {
-            sut = CircularBuffer<Int>(capacity: i, matchingExactly: false)
+            sut = CircularBuffer<Int>.init(capacity: i, matchingExactly: false)
             XCTAssertEqual(sut.capacity, 8)
             XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: i))
         }
         
         for i in 9..<17 {
-            sut = CircularBuffer<Int>(capacity: i, matchingExactly: false)
+            sut = CircularBuffer<Int>.init(capacity: i, matchingExactly: false)
             XCTAssertEqual(sut.capacity, 16)
             XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: i))
         }
         
         for i in 17..<33 {
-            sut = CircularBuffer<Int>(capacity: i, matchingExactly: false)
+            sut = CircularBuffer<Int>.init(capacity: i, matchingExactly: false)
             XCTAssertEqual(sut.capacity, 32)
             XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: i))
         }
@@ -84,13 +85,13 @@ final class CircularBufferTests: XCTestCase {
     
     func testInitCapacity_whenwhenMatchingExactlyIsTrue() {
         for k in 0..<100 {
-            sut = CircularBuffer(capacity: k, matchingExactly: true)
+            sut = CircularBuffer.init(capacity: k, matchingExactly: true)
             XCTAssertEqual(sut.capacity, k)
         }
     }
     
     func testInitRepeating() {
-        sut = CircularBuffer<Int>(repeating: 90, count: 9)
+        sut = CircularBuffer<Int>.init(repeating: 90, count: 9)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertFalse(sut.isEmpty)
@@ -104,7 +105,7 @@ final class CircularBufferTests: XCTestCase {
     
     func testInitRepeating_whenCapacityMatchesExactlyCountIsFalse() {
         for k in 1..<100 {
-            sut = CircularBuffer<Int>(repeating: 90, count: k, capacityMatchesExactlyCount: false)
+            sut = CircularBuffer<Int>.init(repeating: 90, count: k, capacityMatchesExactlyCount: false)
             XCTAssertNotNil(sut)
             XCTAssertNotNil(sut.elements)
             XCTAssertFalse(sut.isEmpty)
@@ -119,7 +120,7 @@ final class CircularBufferTests: XCTestCase {
     
     func testInitRepeating_whenCapacityMatchesExactlyCountIsTrue() {
         for k in 1..<100 {
-            sut = CircularBuffer<Int>(repeating: 90, count: k, capacityMatchesExactlyCount: true)
+            sut = CircularBuffer<Int>.init(repeating: 90, count: k, capacityMatchesExactlyCount: true)
             XCTAssertNotNil(sut)
             XCTAssertNotNil(sut.elements)
             XCTAssertFalse(sut.isEmpty)
@@ -134,7 +135,7 @@ final class CircularBufferTests: XCTestCase {
     func testInitSequence_whenSequenceImplementsWithContiguousStorageIfAvailaable() {
         // empty sequence
         // capacityMatchesExactlyCount == false
-        sut = CircularBuffer(elements: [])
+        sut = CircularBuffer.init(elements: [])
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.minSmartCapacity)
@@ -144,7 +145,7 @@ final class CircularBufferTests: XCTestCase {
         
         // empty sequence
         // capacityMatchesExactlyCount == true
-        sut = CircularBuffer(elements: [], capacityMatchesExactlyCount: true)
+        sut = CircularBuffer.init(elements: [], capacityMatchesExactlyCount: true)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, 0)
@@ -155,7 +156,7 @@ final class CircularBufferTests: XCTestCase {
         // not empty sequence
         // capacityMatchesExactlyCount == false
         let elements = (1...100).shuffled()
-        sut = CircularBuffer(elements: elements)
+        sut = CircularBuffer.init(elements: elements)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: elements.count))
@@ -166,7 +167,7 @@ final class CircularBufferTests: XCTestCase {
         
         // not empty sequence
         // capacityMatchesExactlyCount == true
-        sut = CircularBuffer(elements: elements, capacityMatchesExactlyCount: true)
+        sut = CircularBuffer.init(elements: elements, capacityMatchesExactlyCount: true)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, elements.count)
@@ -180,7 +181,7 @@ final class CircularBufferTests: XCTestCase {
         
         // empty sequence
         // capacityMatchesExactlyCount == false
-        sut = CircularBuffer(elements: AnySequence([]))
+        sut = CircularBuffer.init(elements: AnySequence([]))
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.minSmartCapacity)
@@ -190,7 +191,7 @@ final class CircularBufferTests: XCTestCase {
         
         // empty sequence
         // capacityMatchesExactlyCount == true
-        sut = CircularBuffer(elements: AnySequence([]), capacityMatchesExactlyCount: true)
+        sut = CircularBuffer.init(elements: AnySequence([]), capacityMatchesExactlyCount: true)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, 0)
@@ -202,7 +203,7 @@ final class CircularBufferTests: XCTestCase {
         // capacityMatchesExactlyCount == false
         let elements = (1...100).shuffled()
         XCTAssertEqual(AnySequence(elements).underestimatedCount, elements.count)
-        sut = CircularBuffer(elements: AnySequence(elements))
+        sut = CircularBuffer.init(elements: AnySequence(elements))
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: elements.count))
@@ -213,7 +214,7 @@ final class CircularBufferTests: XCTestCase {
         
         // not empty sequence
         // capacityMatchesExactlyCount == true
-        sut = CircularBuffer(elements: AnySequence(elements), capacityMatchesExactlyCount: true)
+        sut = CircularBuffer.init(elements: AnySequence(elements), capacityMatchesExactlyCount: true)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, elements.count)
@@ -236,7 +237,7 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(seq.underestimatedCount, 0)
         
         // capacityMatchesExactlyCount == false
-        sut = CircularBuffer(elements: seq)
+        sut = CircularBuffer.init(elements: seq)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: elements.count))
@@ -246,7 +247,7 @@ final class CircularBufferTests: XCTestCase {
         XCTAssertEqual(sut.tail, expectedTail)
         
         // capacityMatchesExactlyCount == true
-        sut = CircularBuffer(elements: seq, capacityMatchesExactlyCount: true)
+        sut = CircularBuffer.init(elements: seq, capacityMatchesExactlyCount: true)
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.elements)
         XCTAssertEqual(sut.capacity, elements.count)
@@ -256,8 +257,8 @@ final class CircularBufferTests: XCTestCase {
     }
     
     func testInitOther_whenOtherIsEmpty() {
-        let other = CircularBuffer<Int>()
-        sut = CircularBuffer(other: other)
+        let other = CircularBuffer<Int>.init()
+        sut = CircularBuffer.init(other: other)
         XCTAssertTrue(sut.isEmpty)
         XCTAssertEqual(sut.capacity, other.capacity)
         XCTAssertNotEqual(sut.elements, other.elements)
@@ -269,7 +270,7 @@ final class CircularBufferTests: XCTestCase {
         let elements = (1...100).shuffled()
         for headShift in 1...elements.count {
             let other = CircularBuffer<Int>.headShiftedInstance(contentsOf: elements, headShift: headShift)
-            sut = CircularBuffer(other: other)
+            sut = CircularBuffer.init(other: other)
             XCTAssertEqual(sut.count, other.count)
             XCTAssertEqual(sut.capacity, other.capacity)
             XCTAssertNotEqual(sut.elements, other.elements)
