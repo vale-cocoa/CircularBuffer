@@ -36,124 +36,249 @@ final class ReplaceElementsOperationsTests: XCTestCase {
         super.tearDown()
     }
     
-    /*
-    // MARK: - replace(subRange:with:) tests
-    func test_replaceSubrange_whenBothSubrangeCountAndNewElementsCountAreZero_doesNothing() {
-        var prevCount = sut.count
-        sut.replace(subrange: 0..<0, with: [])
-        XCTAssertEqual(sut.count, prevCount)
-        
-        whenFull()
-        prevCount = sut.count
-        let prevElements = containedElementsWhenFull()
-        var result = [Int]()
-        for i in 0...sut.count {
-            sut.replace(subrange: i..<i, with: [])
-            XCTAssertEqual(sut.count, prevCount)
-            result = sutContainedElements()
-            XCTAssertEqual(result, prevElements)
-            
-            // Restore SUT state and result to previous state for
-            // next iteration
-            whenFull()
-            result.removeAll()
-        }
-    }
-    
-    func test_replaceSubrange_whenSubrangeCountIsZeroAndNewElementsCountGreaterThanZero_newElementsAreInsertedAtSubrangeLowerBoundPosition() {
-        var prevCount = sut.count
-        var result = [Int]()
-        let newElements = [5, 6, 7, 8]
-        sut.replace(subrange: 0..<0, with: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
-        result = sutContainedElements()
-        XCTAssertEqual(result, newElements)
-        
-        whenFull()
-        prevCount = sut.count
-        let previousElements = containedElementsWhenFull()
-        result.removeAll()
-        for i in 0...sut.count {
-            let subrange = i..<i
-            sut.replace(subrange: subrange, with: newElements)
-            result = sutContainedElements()
-            XCTAssertEqual(result.count, prevCount + newElements.count)
-            let expectedResult = Array(previousElements[0..<subrange.lowerBound]) + newElements + Array(previousElements[subrange.lowerBound..<previousElements.count])
-            XCTAssertEqual(result, expectedResult)
-            
-            // Restore SUT state and result to previous state for
-            // next iteration
-            whenFull()
-            result.removeAll()
-        }
-    }
-    
-    func test_replaceSubrange_whenSubrangeCountIsGreaterThanZeroAndNewElementsCountIsZero_removesElementsAtSubrangePositions() {
-        whenFull()
-        let prevCount = sut.count
-        let prevElements = containedElementsWhenFull()
-        var result = [Int]()
-        for startIdx in 0...(sut.count - 1) {
-            for endIdx in (startIdx + 1)...sut.count {
-                let subrange = startIdx..<endIdx
-                XCTAssertGreaterThan(subrange.count, 0)
-                
-                sut.replace(subrange: subrange, with: [])
-                XCTAssertEqual(sut.count, prevCount - subrange.count)
-                result = sutContainedElements()
-                let expectedResult = Array(prevElements[0..<startIdx]) + Array(prevElements[endIdx..<prevElements.endIndex])
-                XCTAssertEqual(result, expectedResult)
-                
-                // restore SUT state and result for next iteration
-                whenFull()
-                result.removeAll()
-            }
-        }
-    }
-    
-    func testReplaceSubrange_whenSubrangeCountIsGreaterThanZeroAndNewElementsCountIsGreaterThanZero_replacesElementsAtSubrangeWithNewElements() {
-        whenFull()
-        let prevElements = containedElementsWhenFull()
-        let prevCount = sut.count
-        let newElements = [5, 6, 7, 8]
-        var result = [Int]()
-        for startIdx in 0...(sut.count - 1) {
-            for endIdx in (startIdx + 1)...sut.count {
-                let subrange = startIdx..<endIdx
-                XCTAssertGreaterThan(subrange.count, 0)
-                
-                sut.replace(subrange: subrange, with: newElements)
-                result = sutContainedElements()
-                var expectedResult = prevElements
-                expectedResult.replaceSubrange(subrange, with: newElements)
-                
-                XCTAssertEqual(sut.count, prevCount - subrange.count + newElements.count)
-                XCTAssertEqual(result, expectedResult)
-                
-                // restore SUT state and result for next iteration
-                whenFull()
-                result.removeAll()
-            }
-        }
-    }
-    
-    func testReplaceSubRange_withSubrangeInMiddleAndNoBufferResizeWillOccur() {
-        sut = nil
-        sut = CircularBuffer<Int>(elements: [1, 2, 10, 11, 8])
-        let prevCount = sut.count
-        let prevCapacity = sut.capacity
-        let prevElements = sutContainedElements()
-        let subrange = 2..<4
-        let newElements = [3, 4, 5, 6, 7]
-        var expectedResult = prevElements
-        expectedResult.replaceSubrange(subrange, with: newElements)
-        XCTAssertEqual(expectedResult, [1, 2, 3, 4, 5, 6, 7 ,8])
-        
+    func testReplace_whenSubrangeIsEmptyAndNewElementsIsEmpty() {
+        var subrange = 0..<0
+        let newElements: Array<Int> = []
+        var prevStoredElements = sut.allStoredElements
         sut.replace(subrange: subrange, with: newElements)
-        XCTAssertEqual(sut.capacity, prevCapacity)
-        XCTAssertEqual(sut.count, prevCount - subrange.count + newElements.count)
-        let result = sutContainedElements()
-        XCTAssertEqual(result, expectedResult)
+        XCTAssertEqual(sut.allStoredElements, prevStoredElements)
+        
+        prevStoredElements = (1...10).shuffled()
+        for lowerBound in prevStoredElements.startIndex...prevStoredElements.endIndex {
+            subrange = lowerBound..<lowerBound
+            sut = CircularBuffer(elements: prevStoredElements)
+            sut.replace(subrange: subrange, with: newElements)
+            XCTAssertEqual(sut.allStoredElements, prevStoredElements)
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1...prevStoredElements.count {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: prevStoredElements, headShift: headShift)
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: true, usingSmartCapacityPolicy: true)
+                XCTAssertEqual(sut.allStoredElements, prevStoredElements)
+            }
+        }
     }
-    */
+    
+    func testReplace_whenSubrangeIsEmptyAndNewElementsIsNotEmpty() {
+        var subrange = 0..<0
+        let newElements = 11...15
+        var prevStoredElements = sut.allStoredElements
+        var expectedResult = Array(newElements) + prevStoredElements
+        sut.replace(subrange: subrange, with: newElements)
+        XCTAssertEqual(sut.allStoredElements, expectedResult)
+        
+        prevStoredElements = (1...10).shuffled()
+        for lowerBound in prevStoredElements.startIndex...prevStoredElements.endIndex {
+            subrange = lowerBound..<lowerBound
+            expectedResult = prevStoredElements
+            expectedResult.replaceSubrange(subrange, with: newElements)
+            
+            sut = CircularBuffer(elements: prevStoredElements)
+            sut.replace(subrange: subrange, with: newElements)
+            // let's also do this test when storage wraps around
+            for headShift in 1...prevStoredElements.count {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: prevStoredElements, headShift: headShift)
+                sut.replace(subrange: subrange, with: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
+        }
+    }
+    
+    func testReplace_whenSubrangeIsNotEmptyAndNewElementsIsEmpty() {
+        let prevStoredElements = (1...10).shuffled()
+        let newElements: Array<Int> = []
+        for lowerBound in prevStoredElements.startIndex..<prevStoredElements.endIndex {
+            for upperBound in (lowerBound + 1)...prevStoredElements.endIndex {
+                let subrange = lowerBound..<upperBound
+                var expectedResult = prevStoredElements
+                expectedResult.replaceSubrange(subrange, with: newElements)
+                sut = CircularBuffer(elements: prevStoredElements)
+                sut.replace(subrange: subrange, with: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                // Let's also do this test when storage wraps around
+                for headShift in 1...prevStoredElements.count {
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: prevStoredElements, headShift: headShift)
+                    sut.replace(subrange: subrange, with: newElements)
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                }
+            }
+        }
+    }
+    
+    func testReplace_whenSubRangeIsNotEmptyAndNewElementsIsNotEmpty() {
+        let prevStoredElements = (1...10).shuffled()
+        let newElementsBase = Array(11...25)
+        for lowerBound in prevStoredElements.startIndex..<prevStoredElements.endIndex {
+            for upperBound in (lowerBound + 1)...prevStoredElements.endIndex {
+                let subrange = lowerBound..<upperBound
+                for k in 1..<newElementsBase.count {
+                    let newElements = newElementsBase[newElementsBase.startIndex...k]
+                    var expectedResult = prevStoredElements
+                    expectedResult.replaceSubrange(subrange, with: newElements)
+                    sut = CircularBuffer(elements: prevStoredElements)
+                    sut.replace(subrange: subrange, with: newElements)
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    
+                    // Let's also do this test when storage wraps around
+                    for headShift in 1...prevStoredElements.count {
+                        sut = CircularBuffer.headShiftedInstance(contentsOf: prevStoredElements, headShift: headShift)
+                        sut.replace(subrange: subrange, with: newElements)
+                        XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Tests for capacity management:
+    // MARK: - Replace operation will decrease or keep the same actual sut's count:
+    func testReplace_whenCapacityShouldDecreaseAndKeepCapacityIsTrue() {
+        var prevStoredElements: Array<Int> = []
+        var newElements: Array<Int> = []
+        var subrange = 0..<0
+        // when sut.isEmpty == true, sut.capacity > 0,
+        // and operation doesn't increase sut.count:
+        sut = CircularBuffer(elements: prevStoredElements)
+        var prevCapacity = sut.capacity
+        XCTAssertGreaterThan(sut.capacity, sut.count)
+        sut.replace(subrange: subrange, with: newElements, keepCapacity: true)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        prevStoredElements = (1...10).shuffled()
+        for lowerBound in prevStoredElements.startIndex..<prevStoredElements.endIndex {
+            for upperBound in (lowerBound + 1)...prevStoredElements.endIndex {
+                subrange = lowerBound..<upperBound
+                guard !subrange.isEmpty else { continue }
+                
+                // when after the replace operation the count stays the same and it was
+                // already smaller than capacity:
+                sut = CircularBuffer(elements: prevStoredElements)
+                XCTAssertGreaterThan(sut.capacity, sut.count)
+                prevCapacity = sut.capacity
+                let prevCount = sut.count
+                newElements = prevStoredElements[subrange].map { $0 * 10 }
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: true)
+                XCTAssertEqual(sut.count, prevCount)
+                XCTAssertEqual(sut.capacity, prevCapacity)
+                
+                // when after the replace operation the count gets reduced
+                sut = CircularBuffer(elements: prevStoredElements)
+                let _ = newElements.popLast()
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: true)
+                XCTAssertEqual(sut.count, prevCount - 1)
+                XCTAssertEqual(sut.capacity, prevCapacity)
+            }
+        }
+    }
+    
+    func testReplace_whenCapacityShouldDecreaseAndKeepCapacityIsFalse() {
+        var prevStoredElements: Array<Int> = []
+        var newElements: Array<Int> = []
+        var subrange = 0..<0
+        // when sut.isEmpty == true, sut.capacity > 0,
+        // and operation doesn't increase sut.count
+        sut = CircularBuffer(elements: prevStoredElements)
+        sut.reserveCapacity(16)
+        var prevCapacity = sut.capacity
+        XCTAssertGreaterThan(sut.capacity, sut.count)
+        sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: true)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, CircularBuffer<Int>.minSmartCapacity)
+        // same test when usingSmartCapacityPolicy == false:
+        sut = CircularBuffer(elements: prevStoredElements)
+        sut.reserveCapacity(16)
+        prevCapacity = sut.capacity
+        XCTAssertGreaterThan(sut.capacity, sut.count)
+        sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: false)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, sut.count)
+        
+        prevStoredElements = (1...10).shuffled()
+        for lowerBound in prevStoredElements.startIndex..<prevStoredElements.endIndex {
+            for upperBound in (lowerBound + 1)...prevStoredElements.endIndex {
+                subrange = lowerBound..<upperBound
+                guard !subrange.isEmpty else { continue }
+                
+                // when after the replace operation the count stays the same and it was
+                // already smaller than capacity:
+                sut = CircularBuffer(elements: prevStoredElements)
+                sut.reserveCapacity(32)
+                XCTAssertGreaterThan(sut.capacity, sut.count)
+                prevCapacity = sut.capacity
+                let prevCount = sut.count
+                newElements = prevStoredElements[subrange].map { $0 * 10 }
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: true)
+                XCTAssertEqual(sut.count, prevCount)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                // same test when usingSmartCapacityPolicy == false:
+                sut = CircularBuffer(elements: prevStoredElements)
+                XCTAssertGreaterThan(sut.capacity, sut.count)
+                prevCapacity = sut.capacity
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: false)
+                XCTAssertEqual(sut.count, prevCount)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, sut.count)
+                
+                // when after the replace operation the count gets reduced
+                sut = CircularBuffer(elements: prevStoredElements)
+                sut.reserveCapacity(32)
+                prevCapacity = sut.capacity
+                let _ = newElements.popLast()
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: true)
+                XCTAssertEqual(sut.count, prevCount - 1)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                // same test when usingSmartCapacityPolicy == false:
+                sut = CircularBuffer(elements: prevStoredElements)
+                XCTAssertGreaterThan(sut.capacity, sut.count)
+                prevCapacity = sut.capacity
+                sut.replace(subrange: subrange, with: newElements, keepCapacity: false, usingSmartCapacityPolicy: false)
+                XCTAssertEqual(sut.count, prevCount - 1)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, sut.count)
+            }
+        }
+    }
+    
+    // MARK: - Replace operation will increase actual sut's count
+    func testReplace_whenCapacityShouldIncrease() {
+        var prevStoredElements: Array<Int> = []
+        sut = CircularBuffer(elements: prevStoredElements)
+        var prevCapacity = sut.capacity
+        var prevCount = sut.count
+        var newelements = (1...5).shuffled()
+        var subrange = 0..<0
+        var newCount = prevCount - subrange.count + newelements.count
+        XCTAssertGreaterThan(newCount, sut.residualCapacity)
+        sut.replace(subrange: subrange, with: newelements, usingSmartCapacityPolicy: true)
+        XCTAssertGreaterThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: newCount))
+        // same test when usingSmartCapacityPolicy == false:
+        sut = CircularBuffer(elements: prevStoredElements)
+        sut.replace(subrange: subrange, with: newelements, usingSmartCapacityPolicy: false)
+        XCTAssertGreaterThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, sut.count)
+        
+        prevStoredElements = (1...10).shuffled()
+        newelements = (1...17).map { $0 + 10 }
+        for lowerBound in prevStoredElements.startIndex..<prevStoredElements.endIndex {
+            for upperBound in (lowerBound + 1)...prevStoredElements.endIndex {
+                subrange = lowerBound..<upperBound
+                sut = CircularBuffer(elements: prevStoredElements)
+                prevCapacity = sut.capacity
+                prevCount = sut.count
+                newCount = prevCount - subrange.count + newelements.count
+                XCTAssertGreaterThan(newCount, sut.residualCapacity)
+                sut.replace(subrange: subrange, with: newelements, usingSmartCapacityPolicy: true)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: newCount))
+                // same test when usingSmartCapacityPolicy == false:
+                sut = CircularBuffer(elements: prevStoredElements)
+                sut.replace(subrange: subrange, with: newelements, usingSmartCapacityPolicy: false)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, sut.count)
+            }
+        }
+    }
+    
 }

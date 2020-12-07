@@ -36,28 +36,37 @@ final class RemoveElementsOperationsTests: XCTestCase {
         super.tearDown()
     }
     
-    /*
     // MARK: - popFirst() tests
-    func testPopFirst_whenEmpty_returnsNil() {
+    func testPopFirst() {
+        // when sut.isEmpty == true
         XCTAssertTrue(sut.isEmpty)
         XCTAssertNil(sut.popFirst())
+        
+        // when sut.isEmpty == false
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
+        while !sut.isEmpty {
+            let oldFirst = sut.first
+            let previousCount = sut.count
+            XCTAssertEqual(sut.popFirst(), oldFirst)
+            XCTAssertNotEqual(sut.first, oldFirst)
+            XCTAssertEqual(sut.count, previousCount - 1)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+            while !sut.isEmpty {
+                let oldFirst = sut.first
+                let previousCount = sut.count
+                XCTAssertEqual(sut.popFirst(), oldFirst)
+                XCTAssertNotEqual(sut.first, oldFirst)
+                XCTAssertEqual(sut.count, previousCount - 1)
+            }
+        }
     }
     
-    func testPopFirst_whenNotEmpty_countDecreasesByOne() {
-        whenFull()
-        let previousCount = sut.count
-        sut.popFirst()
-        XCTAssertEqual(sut.count, previousCount - 1)
-    }
-    
-    func testPopFirst_whenNotEmpty_removesAndReturnsFirst() {
-        whenFull()
-        let oldFirst = sut.first
-        XCTAssertEqual(sut.popFirst(), oldFirst)
-        XCTAssertNotEqual(sut.first, oldFirst)
-    }
-    
-    func testPopFirst_reducesCapacityWhenPossible() {
+    func testPopFirst_reducesCapacityUsingSmartPolicy() {
         sut = CircularBuffer(elements: 1...6)
         var prevCapacity = sut.capacity
         while let _ = sut.popFirst() {
@@ -86,112 +95,68 @@ final class RemoveElementsOperationsTests: XCTestCase {
         XCTAssertEqual(sut.capacity, prevCapacity)
     }
     
-    // MARK: - removeFirst(_:keepCapacity:) tests
-    func testRemoveFirst_whenZero_doesntRemoveAnyElementAndReturnsEmptyArray() {
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        let prevCount = sut.count
-        XCTAssertEqual(sut.removeFirst(0), [])
-        XCTAssertEqual(prevCount, sut.count)
-        for i in 0..<sut.count {
-            XCTAssertEqual(sut[i], containedElements[i])
-        }
-    }
-    
-    func testRemoveFirst_whenOne_removesAndReturnsFirstElementAndDecreasesCountByOne() {
-        whenFull()
-        let prevCount = sut.count
-        let firstElement = [sut.first]
-        XCTAssertEqual(sut.removeFirst(1), firstElement)
-        XCTAssertEqual(sut.count, prevCount - 1)
-        XCTAssertNotEqual(sut.first, firstElement.first!)
-    }
-    
-    func testRemoveFirst_whenEqualCount_removesAndReturnsAllElements() {
-        whenFull()
-        XCTAssertEqual(sut.removeFirst(sut.count), containedElementsWhenFull())
+    // MARK: - popFront() tests
+    func testPopFront() {
+        // when isEmpty, returns nil:
         XCTAssertTrue(sut.isEmpty)
-    }
-    
-    func testRemoveFirst_whenMoreThanOneAndLessThanCount_removesAndReturnsFirstElements() {
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        XCTAssertEqual(sut.removeFirst(containedElements.count / 2), Array(containedElements[0..<containedElements.count / 2]))
-        XCTAssertEqual(sut.count, (containedElements.count - (containedElements.count / 2)))
-    }
-    
-    func testRemoveFirst_whenContainedElementsAreSplitInBuffer() {
-        sut.push(2)
-        sut.push(1)
-        sut.append(3)
-        sut.append(4)
-        XCTAssertGreaterThan(sut.head + 3, sut.capacity)
-        XCTAssertEqual([sut[0], sut[1], sut[2], sut[3]], [1, 2, 3, 4])
+        XCTAssertNil(sut.popFront())
         
-        XCTAssertEqual(sut.removeFirst(3), [1, 2, 3])
-        XCTAssertEqual(sut.count, 1)
-        XCTAssertEqual(sut.first, sut.last)
-        XCTAssertEqual(sut.first, 4)
-    }
-    
-    func testRemoveFirst_whenZeroAndKeepCapacityIsFalseAndCapacityCantBeReducedAnyFurther_thenDoesntReduceCapacity() {
-        whenFull()
-        XCTAssert(sut.isFull)
-        var expectedCapacity = sut.capacity
-        sut.removeFirst(0, keepCapacity: false)
-        XCTAssertEqual(sut.count, expectedCapacity)
-        
-        sut.append(5)
-        expectedCapacity = sut.capacity
-        sut.removeFirst(0, keepCapacity: false)
-        XCTAssertEqual(sut.capacity, expectedCapacity)
-    }
-    
-    func testRemoveFirst_whenCountIsZeroAndKeepCapacityIsFalse_thenReducesCapacityWhenPossible() {
-        whenFull()
+        // when not empty, removes and returns first, capacity stays the same:
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
         let expectedCapacity = sut.capacity
-        sut.reserveCapacity(5)
-        XCTAssertGreaterThan(sut.capacity, expectedCapacity)
-        XCTAssertEqual(sut.count, expectedCapacity)
-        
-        sut.removeFirst(0, keepCapacity: false)
-        XCTAssertEqual(sut.capacity, expectedCapacity)
-    }
-    
-    func testRemoveFirst_whenKeepCapacityFalseAndRemovesEnoughElementsToTriggerResize_thenCapacityGetsResized() {
-        whenFull()
-        var prevCapacity = sut.capacity
-        var added = 0
-        while sut.capacity <= (prevCapacity << 1) {
-            added += 1
-            sut.append(added + 4)
+        for i in 0..<elements.count {
+            let prevFirst = sut.first
+            let expectedResult = Array(elements[(i + 1)..<elements.endIndex])
+            XCTAssertEqual(sut.popFront(), prevFirst)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
         }
-        prevCapacity = sut.capacity
-        sut.removeFirst(added, keepCapacity: false)
-        XCTAssertLessThan(sut.capacity, prevCapacity)
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+            for i in 0..<elements.count {
+                let prevFirst = sut.first
+                let expectedResult = Array(elements[(i + 1)..<elements.endIndex])
+                XCTAssertEqual(sut.popFront(), prevFirst)
+                XCTAssertEqual(sut.capacity, expectedCapacity)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
+        }
     }
     
     // MARK: - popLast() tests
-    func testPopLast_whenEmpty_returnsNil() {
+    func testPopLast() {
+        // when sut.isEmpty == true
         XCTAssertTrue(sut.isEmpty)
         XCTAssertNil(sut.popLast())
+        
+        // when sut.isEmpty == false
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
+        while !sut.isEmpty {
+            let oldLast = sut.last
+            let previousCount = sut.count
+            XCTAssertEqual(sut.popLast(), oldLast)
+            XCTAssertNotEqual(sut.last, oldLast)
+            XCTAssertEqual(sut.count, previousCount - 1)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+            while !sut.isEmpty {
+                let oldLast = sut.last
+                let previousCount = sut.count
+                XCTAssertEqual(sut.popLast(), oldLast)
+                XCTAssertNotEqual(sut.last, oldLast)
+                XCTAssertEqual(sut.count, previousCount - 1)
+            }
+        }
     }
-    
-    func testPopLast_whenNotEmpty_countDecreasesByOne() {
-        whenFull()
-        let previousCount = sut.count
-        sut.popLast()
-        XCTAssertEqual(sut.count, previousCount - 1)
-    }
-    
-    func testPopLast_whenNotEmpty_removesAndReturnsLast() {
-        whenFull()
-        let oldLast = sut.last
-        XCTAssertEqual(sut.popLast(), oldLast)
-        XCTAssertNotEqual(sut.last, oldLast)
-    }
-    
-    func testPopLast_reducesCapacityWhenPossible() {
+        
+    func testPopLast_reducesCapacityUsingSmartPolicy() {
         sut = CircularBuffer(elements: 1...6)
         var prevCapacity = sut.capacity
         while let _ = sut.popLast() {
@@ -220,204 +185,550 @@ final class RemoveElementsOperationsTests: XCTestCase {
         XCTAssertEqual(sut.capacity, prevCapacity)
     }
     
-    // MARK: - removeLast(_:keepCapacity:) tests
-    func test_removeLast_whenZero_doesntRemoveElementsAndReturnsEmptyArray() {
-        whenFull()
-        let previousCount = sut.count
-        let containedElements = containedElementsWhenFull()
-        XCTAssertEqual(sut.removeLast(0, keepCapacity: true), [])
-        XCTAssertEqual(sut.count, previousCount)
-        for i in 0..<sut.count {
-            XCTAssertEqual(sut[i], containedElements[i])
-        }
-    }
-    
-    func testRemoveLast_whenOne_removesAndReturnsLastElementAndDecreasesByOneCount() {
-        whenFull()
-        let lastElement = [sut.last]
-        let previousCount = sut.count
-        
-        XCTAssertEqual(sut.removeLast(1), lastElement)
-        XCTAssertEqual(sut.count, previousCount - 1)
-        XCTAssertNotEqual(sut.last, lastElement.first!)
-    }
-    
-    func testRemoveLast_whenEqualCount_removesAndReturnsAllElements() {
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        XCTAssertEqual(sut.removeLast(sut.count), containedElements)
+    // MARK: - popBack() tests
+    func testPopBack() {
+        // when isEmpty, returns nil:
         XCTAssertTrue(sut.isEmpty)
-    }
-    
-    func testRemoveLast_whenMoreThanOneAndLessThanCount_removesAndReturnsLastElements() {
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        XCTAssertEqual(sut.removeLast(sut.count / 2), Array(containedElements[containedElements.count / 2..<containedElements.count]))
-        XCTAssertEqual(sut.count, (containedElements.count -  (containedElements.count / 2)))
-        var restOfElements = [Int]()
-        while let el = sut.popFirst() {
-            restOfElements.append(el)
-        }
-        XCTAssertTrue(sut.isEmpty)
-        XCTAssertEqual(sut.head, sut.tail)
-        XCTAssertEqual(restOfElements, Array(containedElements[0..<(containedElements.count / 2)]))
-    }
-    
-    func testRemoveLast_whenContainedElementsAreSplitInBuffer() {
-        sut.append(2)
-        sut.append(3)
-        sut.append(4)
-        sut.push(1)
-        XCTAssertGreaterThanOrEqual(sut.tail - 3, 0)
+        XCTAssertNil(sut.popBack())
         
-        let lastElements = [sut[1], sut[2], sut[3]]
-        XCTAssertEqual(sut.removeLast(3), lastElements)
-        XCTAssertEqual(sut.count, 1)
-        XCTAssertEqual(sut.first, sut.last)
-        XCTAssertEqual(sut.first, 1)
-    }
-    
-    func testRemoveLast_whenZeroAndKeepCapacityIsFalseAndCapacityCantBeReducedAnyFurther_doesntReduceCapacity() {
-        whenFull()
-        XCTAssert(sut.isFull)
-        var expectedCapacity = sut.capacity
-        sut.removeLast(0, keepCapacity: false)
-        XCTAssertEqual(sut.count, expectedCapacity)
-        
-        sut.append(5)
-        expectedCapacity = sut.capacity
-        sut.removeLast(0, keepCapacity: false)
-        XCTAssertEqual(sut.capacity, expectedCapacity)
-    }
-    
-    func testRemoveLast_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
-        whenFull()
+        // when not empty, removes and returns last, capacity stays the same:
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
         let expectedCapacity = sut.capacity
-        sut.reserveCapacity(5)
-        XCTAssertGreaterThan(sut.capacity, expectedCapacity)
-        XCTAssertEqual(sut.count, expectedCapacity)
-        
-        sut.removeLast(0, keepCapacity: false)
-        XCTAssertEqual(sut.capacity, expectedCapacity)
-    }
-    
-    func testRemoveLast_whenKeepCapacityFalseAndRemovesEnoughElementsToTriggerResize_capacityGetsResized() {
-        whenFull()
-        var prevCapacity = sut.capacity
-        var added = 0
-        while sut.capacity <= (prevCapacity << 1) {
-            added += 1
-            sut.append(added + 4)
+        for i in 1...elements.count {
+            let prevLast = sut.last
+            let expectedResult = Array(elements[0..<(elements.endIndex - i)])
+            XCTAssertEqual(sut.popBack(), prevLast)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
         }
-        prevCapacity = sut.capacity
-        sut.removeLast(added, keepCapacity: false)
-        XCTAssertLessThan(sut.capacity, prevCapacity)
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+            for i in 1...elements.count {
+                let prevLast = sut.last
+                let expectedResult = Array(elements[0..<(elements.endIndex - i)])
+                XCTAssertEqual(sut.popBack(), prevLast)
+                XCTAssertEqual(sut.capacity, expectedCapacity)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
+        }
     }
     
-    // MARK: - removeAt(index:count:keepCapacity:) tests
-    func testRemoveAt_whenCountIsZero_doesntRemoveElementsAndReturnsEmptyArray() {
-        whenFull()
-        let expectedCount = sut.count
-        let containedElements = containedElementsWhenFull()
+    // MARK: - removeFirst(_:keepCapacity:usingSmartCapacityPolicy:) tests
+    func testRemoveFirst_whenKIsZero() {
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
+        var prevCapacity = sut.capacity
+        var prevContainedElements = sut.allStoredElements
+        // when keepCapacity == true
+        XCTAssertEqual(sut.removeFirst(0), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
         
-        for idx in 0..<sut.count {
+        // when keepCapacity == false and usingSmartCapacity == true
+        // and capacity is too big, reduces capacity:
+        var greaterSmartCapacity = sut.capacity << 2
+        sut.reserveCapacity(greaterSmartCapacity - sut.count)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeFirst(0, keepCapacity: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity >> 2)
+        
+        // when keepCapacity == false and usingSmartCapacity == true
+        // and capacity is not too big, doesn't reduce capacity:
+        greaterSmartCapacity = sut.capacity << 1
+        sut.reserveCapacity(greaterSmartCapacity - sut.count)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeFirst(0, keepCapacity: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        // when keepCapacity == false and usingSmartCapacity == false
+        // and capacity is greater than count, reduces capacity to count:
+        XCTAssertGreaterThan(sut.capacity, sut.count)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeFirst(0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, sut.count)
+        
+        // when keepCapacity == false and usingSmartCapacity == false
+        // and capacity is equal to count, doesn't reduce capacity:
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeFirst(0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+    }
+    
+    func testRemoveFirst_whenKIsGreaterThanZeroAndKeepCapacityIsTrue() {
+        let elements = (1...10).shuffled()
+        for k in 1...elements.count {
+            sut = CircularBuffer(elements: elements)
+            let prevCapacity = sut.capacity
+            let expectedResult = Array(sut.allStoredElements[0..<k])
+            let expectedRemainingElements = Array(sut.allStoredElements[k..<sut.count])
+            XCTAssertEqual(sut.removeFirst(k), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            for k in 1...elements.count {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                let prevCapacity = sut.capacity
+                let expectedResult = Array(sut.allStoredElements[0..<k])
+                let expectedRemainingElements = Array(sut.allStoredElements[k..<sut.count])
+                XCTAssertEqual(sut.removeFirst(k), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, prevCapacity)
+            }
+        }
+    }
+    
+    func testRemoveFirst_whenKIsGreaterThanZeroAndKeepCapacityIsFalse() {
+        let elements = (1...10).shuffled()
+        for k in 1...elements.count {
+            // usingSmartCapacityPolicy == true and capacity is big enough to get
+            // reduced after removal:
+            sut = CircularBuffer(elements: elements)
+            let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+            sut.reserveCapacity(biggerSmartCapacity - sut.count)
+            var prevCapacity = sut.capacity
+            let expectedResult = Array(sut.allStoredElements[0..<k])
+            let expectedRemainingElements = Array(sut.allStoredElements[k..<sut.count])
+            XCTAssertEqual(sut.removeFirst(k, keepCapacity: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertLessThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+            
+            // usingSmartCapacityPolicy == true and capacity is not that big to get
+            // reduced after removal every time:
+            sut = CircularBuffer(elements: elements)
+            prevCapacity = sut.capacity
+            XCTAssertEqual(sut.removeFirst(k, keepCapacity: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+            
+            // usingSmartCapacityPolicy == false
+            sut = CircularBuffer(elements: elements)
+            prevCapacity = sut.capacity
+            XCTAssertEqual(sut.removeFirst(k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, sut.count)
+        }
+        
+        // Let's also do these tests when storage wraps around
+        for headShift in 1...elements.count {
+            for k in 1...elements.count {
+                // usingSmartCapacityPolicy == true and capacity is big enough to get
+                // reduced after removal:
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+                sut.reserveCapacity(biggerSmartCapacity - sut.count)
+                var prevCapacity = sut.capacity
+                let expectedResult = Array(sut.allStoredElements[0..<k])
+                let expectedRemainingElements = Array(sut.allStoredElements[k..<sut.count])
+                XCTAssertEqual(sut.removeFirst(k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+                
+                // usingSmartCapacityPolicy == true and capacity is not that big to get
+                // reduced after removal every time:
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeFirst(k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+                
+                // usingSmartCapacityPolicy == false
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeFirst(k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, sut.count)
+            }
+        }
+    }
+    
+    // MARK: - removeLast(_:keepCapacity:usingSmartCapacityPolicy:) tests
+    func testRemoveLast_whenKIsZero() {
+        let elements = (1...10).shuffled()
+        sut = CircularBuffer(elements: elements)
+        var prevCapacity = sut.capacity
+        var prevContainedElements = sut.allStoredElements
+        // when keepCapacity == true
+        XCTAssertEqual(sut.removeLast(0), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        // when keepCapacity == false and usingSmartCapacity == true
+        // and capacity is too big, reduces capacity:
+        var greaterSmartCapacity = sut.capacity << 2
+        sut.reserveCapacity(greaterSmartCapacity - sut.count)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeLast(0, keepCapacity: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity >> 2)
+        
+        // when keepCapacity == false and usingSmartCapacity == true
+        // and capacity is not too big, doesn't reduce capacity:
+        greaterSmartCapacity = sut.capacity << 1
+        sut.reserveCapacity(greaterSmartCapacity - sut.count)
+        XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeLast(0, keepCapacity: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        
+        // when keepCapacity == false and usingSmartCapacity == false
+        // and capacity is greater than count, reduces capacity to count:
+        XCTAssertGreaterThan(sut.capacity, sut.count)
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeLast(0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, sut.count)
+        
+        // when keepCapacity == false and usingSmartCapacity == false
+        // and capacity is equal to count, doesn't reduce capacity:
+        prevCapacity = sut.capacity
+        prevContainedElements = sut.allStoredElements
+        XCTAssertEqual(sut.removeLast(0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+        XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+    }
+    
+    func testRemoveLast_whenKIsGreaterThanZeroAndKeepCapacityIsTrue() {
+        let elements = (1...10).shuffled()
+        for k in 1...elements.count {
+            sut = CircularBuffer(elements: elements)
+            let prevCapacity = sut.capacity
+            let expectedResult = Array(sut.allStoredElements[(sut.count - k)..<sut.count])
+            let expectedRemainingElements = Array(sut.allStoredElements[0..<(sut.count - k)])
+            XCTAssertEqual(sut.removeLast(k), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headShift in 1...elements.count {
+            for k in 1...elements.count {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                let prevCapacity = sut.capacity
+                let expectedResult = Array(sut.allStoredElements[(sut.count - k)..<sut.count])
+                let expectedRemainingElements = Array(sut.allStoredElements[0..<(sut.count - k)])
+                XCTAssertEqual(sut.removeLast(k), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, prevCapacity)
+            }
+        }
+    }
+    
+    func testRemoveLast_whenKIsGreaterThanZeroAndKeepCapacityIsFalse() {
+        let elements = (1...10).shuffled()
+        for k in 1...elements.count {
+            // usingSmartCapacityPolicy == true and capacity is big enough to get
+            // reduced after removal:
+            sut = CircularBuffer(elements: elements)
+            let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+            sut.reserveCapacity(biggerSmartCapacity - sut.count)
+            var prevCapacity = sut.capacity
+            let expectedResult = Array(sut.allStoredElements[(sut.count - k)..<sut.count])
+            let expectedRemainingElements = Array(sut.allStoredElements[0..<(sut.count - k)])
+            XCTAssertEqual(sut.removeLast(k, keepCapacity: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertLessThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+            
+            // usingSmartCapacityPolicy == true and capacity is not that big to get
+            // reduced after removal every time:
+            sut = CircularBuffer(elements: elements)
+            prevCapacity = sut.capacity
+            XCTAssertEqual(sut.removeLast(k, keepCapacity: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+            
+            // usingSmartCapacityPolicy == false
+            sut = CircularBuffer(elements: elements)
+            prevCapacity = sut.capacity
+            XCTAssertEqual(sut.removeLast(k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+            XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+            XCTAssertEqual(sut.capacity, sut.count)
+        }
+        
+        // Let's also do these tests when storage wraps around
+        for headShift in 1...elements.count {
+            for k in 1...elements.count {
+                // usingSmartCapacityPolicy == true and capacity is big enough to get
+                // reduced after removal:
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+                sut.reserveCapacity(biggerSmartCapacity - sut.count)
+                var prevCapacity = sut.capacity
+                let expectedResult = Array(sut.allStoredElements[(sut.count - k)..<sut.count])
+                let expectedRemainingElements = Array(sut.allStoredElements[0..<(sut.count - k)])
+                XCTAssertEqual(sut.removeLast(k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+                
+                // usingSmartCapacityPolicy == true and capacity is not that big to get
+                // reduced after removal every time:
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeLast(k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+                
+                // usingSmartCapacityPolicy == false
+                sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeLast(k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, sut.count)
+            }
+        }
+    }
+    
+    // MARK: - removeAt(index:count:keepCapacity:usingSmartCapacityPolicy:) tests
+    func testRemoveAt_whenCountToRemoveIsZero() {
+        let elements = (1...10).shuffled()
+        for idx in 0..<elements.count {
+            // when keepCapacity == true
+            sut = CircularBuffer(elements: elements)
+            var prevCapacity = sut.capacity
+            var prevContainedElements = sut.allStoredElements
             XCTAssertEqual(sut.removeAt(index: idx, count: 0), [])
-            XCTAssertEqual(sut.count, expectedCount)
-            for i in 0..<sut.count {
-                XCTAssertEqual(sut[i], containedElements[i])
+            XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            
+            // when keepCapacity == false and usingSmartCapacity == true
+            // and capacity is too big, reduces capacity:
+            var greaterSmartCapacity = sut.capacity << 2
+            sut.reserveCapacity(greaterSmartCapacity - sut.count)
+            XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+            prevCapacity = sut.capacity
+            prevContainedElements = sut.allStoredElements
+            XCTAssertEqual(sut.removeAt(index: idx, count: 0, keepCapacity: false), [])
+            XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+            XCTAssertLessThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, greaterSmartCapacity >> 2)
+            
+            // when keepCapacity == false and usingSmartCapacity == true
+            // and capacity is not too big, doesn't reduce capacity
+            greaterSmartCapacity = sut.capacity << 1
+            sut.reserveCapacity(greaterSmartCapacity - sut.count)
+            XCTAssertEqual(sut.capacity, greaterSmartCapacity)
+            prevCapacity = sut.capacity
+            prevContainedElements = sut.allStoredElements
+            XCTAssertEqual(sut.removeAt(index: idx, count: 0, keepCapacity: false), [])
+            XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            
+            // when keepCapacity == false and usingSmartCapacity == false
+            // and capacity is greater than count, reduces capacity to count
+            XCTAssertGreaterThan(sut.capacity, sut.count)
+            prevCapacity = sut.capacity
+            prevContainedElements = sut.allStoredElements
+            XCTAssertEqual(sut.removeAt(index: idx, count: 0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+            XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+            XCTAssertEqual(sut.capacity, sut.count)
+            
+            // when keepCapacity == false and usingSmartCapacity == false
+            // and capacity is equal to count, doesn't reduce capacity
+            prevCapacity = sut.capacity
+            prevContainedElements = sut.allStoredElements
+            XCTAssertEqual(sut.removeAt(index: idx, count: 0, keepCapacity: false, usingSmartCapacityPolicy: false), [])
+            XCTAssertEqual(sut.allStoredElements, prevContainedElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+        }
+    }
+    
+    func testRemoveAt_whenCountToRemoveIsGreaterThanZeroAndKeepCapacityIsTrue() {
+        let elements = (1...10).shuffled()
+        for idx in 0..<elements.count {
+            for k in 1...(elements.count - idx) {
+                let expectedResult = Array(elements[idx..<(idx + k)])
+                var expectedRemainingElements = elements
+                expectedRemainingElements.removeSubrange(idx..<(idx + k))
+                sut = CircularBuffer(elements: elements)
+                var prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeAt(index: idx, count: k), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, prevCapacity)
+                
+                // let's also do this test when storage wraps around
+                for headShift in 1...elements.count {
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                    prevCapacity = sut.capacity
+                    XCTAssertEqual(sut.removeAt(index: idx, count: k), expectedResult)
+                    XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                    XCTAssertEqual(sut.capacity, prevCapacity)
+                }
             }
         }
     }
     
-    func testRemoveAt_whenCountIsOne_removesAndReturnsElementAtIdxAndDecreasesCountByOne() {
-        whenFull()
-        let prevCount = sut.count
-        let containedElements = containedElementsWhenFull()
-        for idx in 0..<4 {
-            XCTAssertEqual(sut.removeAt(index: idx, count: 1), [containedElements[idx]])
-            XCTAssertEqual(sut.count, prevCount - 1)
-            
-            // restore SUT state to full on each iteration
-            whenFull()
-        }
-    }
-    
-    func testRemoveAt_whenCountMoreThanOneAndLessThanCount_removesAndReturnsTheElementAtIndexAndElementsAfterAndDecreasesCount() {
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        for idx in 0..<sut.count {
-            let prevCount = sut.count
-            let k = sut.count - idx
-            let expectedRemoved = Array(containedElements[idx..<(idx + k)])
-            var expectedRemaining = containedElements
-            expectedRemaining.removeSubrange(idx..<(idx + k))
-            XCTAssertEqual(sut.removeAt(index: idx, count: k), expectedRemoved)
-            XCTAssertEqual(sut.count, prevCount - k)
-            XCTAssertEqual(sut.count, expectedRemaining.count)
-            for i in 0..<sut.count {
-                XCTAssertEqual(sut[i], expectedRemaining[i])
+    func testRemoveAt_whenCountIsGreaterThanZeroAndKeepCapacityIsFalse() {
+        let elements = (1...10).shuffled()
+        for idx in 0..<elements.count {
+            for k in 1...(elements.count - idx) {
+                let expectedResult = Array(elements[idx..<(idx + k)])
+                var expectedRemainingElements = elements
+                expectedRemainingElements.removeSubrange(idx..<(idx + k))
+                // usingSmartCapacityPolicy == true and capacity is big enough to get
+                // reduced after removal
+                sut = CircularBuffer(elements: elements)
+                let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+                sut.reserveCapacity(biggerSmartCapacity - sut.count)
+                var prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertLessThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+                
+                // usingSmartCapacity == true
+                // and capacity is not too big, doesn't reduce capacity after removal
+                sut = CircularBuffer(elements: elements)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+                
+                // usingSmartCapacity == false
+                sut = CircularBuffer(elements: elements)
+                prevCapacity = sut.capacity
+                XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+                XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                XCTAssertEqual(sut.capacity, sut.count)
+                
+                // let's also do these tests when storage wraps around:
+                for headShift in 1...elements.count {
+                    // usingSmartCapacityPolicy == true and capacity is big enough to get
+                    // reduced after removal
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                    let biggerSmartCapacity = CircularBuffer<Int>.smartCapacityFor(count: sut.count - k) << 2
+                    sut.reserveCapacity(biggerSmartCapacity - sut.count)
+                    var prevCapacity = sut.capacity
+                    XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false), expectedResult)
+                    XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                    XCTAssertLessThan(sut.capacity, prevCapacity)
+                    XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
+                    
+                    // usingSmartCapacity == true
+                    // and capacity is not too big, doesn't reduce capacity after removal
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                    prevCapacity = sut.capacity
+                    XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false), expectedResult)
+                    XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                    XCTAssertEqual(sut.capacity, (sut.isEmpty ? CircularBuffer<Int>.minSmartCapacity : (1...5 ~= k ? prevCapacity : CircularBuffer<Int>.smartCapacityFor(count: sut.count))))
+                    
+                    // usingSmartCapacity == false
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headShift)
+                    prevCapacity = sut.capacity
+                    XCTAssertEqual(sut.removeAt(index: idx, count: k, keepCapacity: false, usingSmartCapacityPolicy: false), expectedResult)
+                    XCTAssertEqual(sut.allStoredElements, expectedRemainingElements)
+                    XCTAssertEqual(sut.capacity, sut.count)
+                }
             }
-            
-            // restore SUT state to full on each iteration
-            whenFull()
         }
     }
     
-    func testRemoveAt_whenCountIsZeroAndKeepCapacityIsFalseAndCapacityCantBeReducedAnyFurther_doesntReduceCapacity() {
-        whenFull()
-        XCTAssert(sut.isFull)
-        var expectedCapacity = sut.capacity
-        
-        for idx in 0..<sut.count {
-            sut.removeAt(index: idx, count: 0, keepCapacity: false)
-            XCTAssertEqual(sut.count, expectedCapacity)
-        }
-        
-        sut.append(5)
-        expectedCapacity = sut.capacity
-        
-        for idx in 0..<sut.count {
-            sut.removeAt(index: idx, count: 0, keepCapacity: false)
-            XCTAssertEqual(sut.capacity, expectedCapacity)
-        }
-    }
     
-    func testRemoveAt_whenCountIsZeroAndKeepCapacityIsFalse_reducesCapacityWhenPossible() {
-        whenFull()
-        let expectedCapacity = sut.capacity
-        sut.reserveCapacity(5)
-        XCTAssertGreaterThan(sut.capacity, expectedCapacity)
-        XCTAssertEqual(sut.count, expectedCapacity)
-        
-        for idx in 0..<sut.count {
-            sut.removeAt(index: idx, count: 0, keepCapacity: false)
-            XCTAssertEqual(sut.capacity, expectedCapacity)
-        }
-    }
-    
-    // MARK: - removeAll(keepCapacity:) tests
-    func testRemoveAll_whenEmpty_thenReturnsEmptyArrayAndKeepsOrReducesCapacityAccordingly() {
-        sut.reserveCapacity(10)
-        let prevCapacity = sut.capacity
+    // MARK: - removeAll(keepCapacity:usingSmartCapacityPolicy:) tests
+    func testRemoveAll_whenIsEmpty() {
+        // keepCapacity == true
         XCTAssertTrue(sut.isEmpty)
-        XCTAssertEqual(sut.removeAll(keepCapacity: true), [])
+        var prevCapacity = sut.capacity
+        sut.removeAll()
+        XCTAssertTrue(sut.isEmpty)
         XCTAssertEqual(sut.capacity, prevCapacity)
         
+        // keepCapacity == false and usingSmartCapacityPolicy == true
+        let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+        sut.reserveCapacity(16)
+        prevCapacity = sut.capacity
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertGreaterThan(sut.capacity, minSmartCapacity)
         sut.removeAll(keepCapacity: false)
+        XCTAssertTrue(sut.isEmpty)
         XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, minSmartCapacity)
+        
+        // keepCapacity == false and usingSmartCapacityPolicy == false
+        sut.reserveCapacity(16)
+        prevCapacity = sut.capacity
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertGreaterThan(sut.capacity, 0)
+        sut.removeAll(keepCapacity: false, usingSmartCapacityPolicy: false)
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.capacity, 0)
     }
     
-    func testRemoveAll_whenNotEmpty_thenReturnsContainedElementsAndKeepsOrReducesCapacityAccordingly() {
-        let expectedResult = Array(1...24)
-        sut = CircularBuffer(elements: expectedResult)
+    func testRemoveAll_whenIsNotEmpty() {
+        let elements = (1...10).shuffled()
+        
+        // keepCapacity == true
+        sut = CircularBuffer(elements: elements)
         var prevCapacity = sut.capacity
-        XCTAssertEqual(sut.removeAll(keepCapacity: true), expectedResult)
+        sut.removeAll()
+        XCTAssertTrue(sut.isEmpty)
         XCTAssertEqual(sut.capacity, prevCapacity)
         
-        sut = CircularBuffer(elements: expectedResult)
+        // keepCapacity == false and usingSmartCapacityPolicy == true
+        let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+        sut = CircularBuffer(elements: elements)
         prevCapacity = sut.capacity
         sut.removeAll(keepCapacity: false)
-        XCTAssertLessThan(sut.capacity, prevCapacity)
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut.capacity, minSmartCapacity)
+        
+        // keepCapacity == false and usingSmartCapacityPolicy == false
+        sut = CircularBuffer(elements: elements)
+        prevCapacity = sut.capacity
+        sut.removeAll(keepCapacity: false, usingSmartCapacityPolicy: false)
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertEqual(sut.capacity, 0)
+        
+        // Let's also do these tests when storage wraps around
+        for headshift in 1...elements.count {
+            // keepCapacity == true
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headshift)
+            var prevCapacity = sut.capacity
+            sut.removeAll()
+            XCTAssertTrue(sut.isEmpty)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            
+            // keepCapacity == false and usingSmartCapacityPolicy == true
+            let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headshift)
+            prevCapacity = sut.capacity
+            sut.removeAll(keepCapacity: false)
+            XCTAssertTrue(sut.isEmpty)
+            XCTAssertEqual(sut.capacity, minSmartCapacity)
+            
+            // keepCapacity == false and usingSmartCapacityPolicy == false
+            sut = CircularBuffer.headShiftedInstance(contentsOf: elements, headShift: headshift)
+            prevCapacity = sut.capacity
+            sut.removeAll(keepCapacity: false, usingSmartCapacityPolicy: false)
+            XCTAssertTrue(sut.isEmpty)
+            XCTAssertEqual(sut.capacity, 0)
+        }
     }
-    */
+    
 }

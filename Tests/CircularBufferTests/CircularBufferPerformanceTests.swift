@@ -21,6 +21,7 @@
 import XCTest
 @testable import CircularBuffer
 
+
 final class CircularBufferPerformanceTests: XCTestCase {
     // MARK: - performance tests
     func testCircularBufferPerformance_smallCount() {

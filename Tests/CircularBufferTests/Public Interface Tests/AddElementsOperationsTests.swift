@@ -36,306 +36,1548 @@ final class AddElementsOperationsTests: XCTestCase {
         super.tearDown()
     }
     
-    /*
     // MARK: - append(_:) tests
-    func testAppend_countIncreasesByOne() {
-        let prevCount = sut.count
-        sut.append(10)
-        XCTAssertEqual(sut.count, prevCount + 1)
+    func testAppend() {
+        for i in 1...10 {
+            let prevCount = sut.count
+            let prevElements = sut.allStoredElements
+            sut.append(i)
+            XCTAssertEqual(sut.count, prevCount + 1)
+            XCTAssertEqual(sut.allStoredElements, (prevElements + [i]))
+            XCTAssertEqual(sut.last, i)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headshift in 1...10 {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: (1...10).shuffled(), headShift: headshift)
+            let prevCount = sut.count
+            let prevElements = sut.allStoredElements
+            let newElement = headshift * 10
+            sut.append(newElement)
+            XCTAssertEqual(sut.count, prevCount + 1)
+            XCTAssertEqual(sut.allStoredElements, (prevElements + [newElement]))
+            XCTAssertEqual(sut.last, newElement)
+        }
     }
     
-    func testAppend_newElementBecomesLast() {
-        let prevLast = sut.last
-        sut.append(10)
-        XCTAssertNotEqual(sut.last, prevLast)
-        XCTAssertEqual(sut.last, 10)
-    }
-    
-    func testAppend_whenFull_capacityGrows() {
-        whenFull()
-        let prevCapacity = sut.capacity
-        sut.append(10)
-        XCTAssertGreaterThan(sut.capacity, prevCapacity)
+    func testAppend_whenIsFull() {
+        for k in 1...100 where CircularBuffer<Int>.smartCapacityFor(count: k) == k {
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            let prevCapacity = sut.capacity
+            sut.append(2000)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, prevCapacity << 1)
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1..<k {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                let prevCapacity = sut.capacity
+                sut.append(2000)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, prevCapacity << 1)
+            }
+        }
     }
     
     // MARK: - append(contentsOf:) tests
-    func testAppendContentsOf() {
-        let newElements = AnySequence<Int>([])
-        sut.append(contentsOf: newElements)
+    func testAppendContentsOf_whenSequenceImplementsWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.append(contentsOf: TestSequence(elements: newElements))
         XCTAssertTrue(sut.isEmpty)
         
-        let newElements1 = AnySequence<Int>(1...4)
-        sut.append(contentsOf: newElements1)
-        XCTAssertEqual(sut.count, 4)
-        XCTAssertEqual(sut.first, 1)
-        XCTAssertEqual(sut.last, 4)
-        for i in 0..<4 {
-            XCTAssertEqual(sut[i], i + 1)
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.append(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements)
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.append(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.append(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
         }
         
-        let newElements2 = AnySequence<Int>(5...8)
-        sut.append(contentsOf: newElements2)
-        XCTAssertEqual(sut.count, 8)
-        XCTAssertEqual(sut.first, 1)
-        XCTAssertEqual(sut.last, 8)
-        for i in 0..<8 {
-            XCTAssertEqual(sut[i], i + 1)
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.append(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.append(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
+        }
+    }
+    
+    func testAppendContentsOf_whenSequenceDoesntImplementWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.append(contentsOf: AnySequence(newElements))
+        XCTAssertTrue(sut.isEmpty)
+        
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.append(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements)
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.append(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.append(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
         }
         
-        let newElements3 = SequenceImplementingWithContiguousStorage(base: [9, 10, 11, 12])
-        sut.append(contentsOf: newElements3)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 1)
-        XCTAssertEqual(sut.last, 12)
-        for i in 0..<12 {
-            XCTAssertEqual(sut[i], i + 1)
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.append(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.append(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
         }
         
-        let empty1 = AnySequence<Int>([])
-        sut.append(contentsOf: empty1)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 1)
-        XCTAssertEqual(sut.last, 12)
-        for i in 0..<12 {
-            XCTAssertEqual(sut[i], i + 1)
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
+        }
+        XCTAssertEqual(seq.underestimatedCount, 0)
+        sut = CircularBuffer(elements: sutElements)
+        sut.append(contentsOf: seq)
+        XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.append(contentsOf: seq)
+            XCTAssertEqual(sut.allStoredElements, sutElements + newElements)
+        }
+    }
+    
+    func testAppendContentsOf_whenIsFull() {
+        let newElements = (101...200).shuffled()
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
         }
         
-        let empty2 = SequenceImplementingWithContiguousStorage(base: [])
-        sut.append(contentsOf: empty2)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 1)
-        XCTAssertEqual(sut.last, 12)
-        for i in 0..<12 {
-            XCTAssertEqual(sut[i], i + 1)
+        for k in 1...100 where CircularBuffer<Int>.smartCapacityFor(count: k) == k {
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            var prevCapacity = sut.capacity
+            // newElements implements withContiguousStorageIfAvailable
+            sut.append(contentsOf: newElements)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // newElements doesn't implement withContiguousStorageIfAvailable
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.append(contentsOf: AnySequence(newElements))
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.append(contentsOf: seq)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1..<k {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                // newElements implements withContiguousStorageIfAvailable
+                sut.append(contentsOf: newElements)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                // newElements doesn't implement withContiguousStorageIfAvailable
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.append(contentsOf: AnySequence(newElements))
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.append(contentsOf: seq)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            }
+        }
+    }
+    
+    func testAppendContentsOf_whenResidualCapacityIsEnoughToStoreNewElements() {
+        let sutElements = (101...200).shuffled()
+        let newElementsStorage = (1..<(CircularBuffer<Int>.smartCapacityFor(count: sutElements.count) - sutElements.count)).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        
+        // sequence implements withContiguousStorageIfAvailable
+        var newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        var prevCapacity = sut.capacity
+        var prevSutElementsAddress = sut.elements
+        sut.append(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.append(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable and
+        // its underestimatedCount is zero despite it stores some elements
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.append(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // let's also do these tests when storage wraps around
+        for headShift in 1..<sutElements.count {
+            // sequence implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.append(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.append(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable and
+            // its underestimatedCount is zero despite it stores some elements
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.append(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        }
+    }
+    
+    // MARK: - pushBack(_:) tests
+    func testPushBack() {
+        sut = CircularBuffer(capacity: 0, matchingExactly: true)
+        // when capacity is 0 nothing happens:
+        XCTAssertEqual(sut.capacity, 0)
+        sut.pushBack(10)
+        XCTAssertEqual(sut.capacity, 0)
+        
+        // when residualCapacity is greater than 0, then element is stored as new last:
+        sut.reserveCapacity(5, matchingExactlyCapacity: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        let expectedCapacity = sut.capacity
+        var newElement = 5
+        var expectedResult: Array<Int> = []
+        while sut.residualCapacity > 0 {
+            expectedResult.append(newElement)
+            sut.pushBack(newElement)
+            XCTAssertEqual(sut.last, newElement)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            
+            newElement -= 1
+        }
+        
+        // when residualCapacity is equal to 0, then element is stored as new last, and
+        // old first gets trumped:
+        XCTAssertEqual(sut.residualCapacity, 0)
+        newElement = 50
+        for i in 1...10 {
+            let _ = expectedResult.remove(at: 0)
+            expectedResult.append(newElement)
+            sut.pushBack(newElement)
+            XCTAssertEqual(sut.last, newElement)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            
+            newElement += i*10
+        }
+        
+        // let's also do these tests when storage wraps around
+        let preStored = (1...10).shuffled()
+        for headShift in 1..<preStored.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: preStored, headShift: headShift)
+            sut.reserveCapacity(5, matchingExactlyCapacity: true)
+            XCTAssertGreaterThan(sut.residualCapacity, 0)
+            // when residual capacity is greater than zero, then element is stored at
+            // last position and elements previously stored don't get trumped:
+            var newElement = 5
+            while sut.residualCapacity > 0 {
+                let prevElements = sut.allStoredElements
+                sut.pushBack(newElement)
+                XCTAssertEqual(sut.allStoredElements, prevElements + [newElement])
+                newElement -= 1
+            }
+            XCTAssertEqual(sut.residualCapacity, 0)
+            // when residualCapacity is equal to 0, then element is stored as new last, and
+            // old first gets trumped:
+            expectedResult = sut.allStoredElements
+            for i in 1...sut.capacity {
+                newElement = i * 100
+                let _ = expectedResult.remove(at: 0)
+                expectedResult.append(newElement)
+                sut.pushBack(newElement)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
+        }
+    }
+    
+    // MARK: - pushBack(contentsOf:) tests
+    func testPushBackContentsOf_whenCapacityIsZero() {
+        // nothing happens whether newElements contains elements or is empty:
+        sut = CircularBuffer(capacity: 0, matchingExactly: true)
+        XCTAssertTrue(sut.isEmpty)
+        sut.pushBack(contentsOf: [])
+        XCTAssertTrue(sut.isEmpty)
+        sut.pushBack(contentsOf: 1...10)
+        XCTAssertTrue(sut.isEmpty)
+    }
+    
+    func testPushBackContentsOf_whenIsEmptyAndSequenceImplementsWithContiguousStorage() {
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        var sutPrevElements = sut.allStoredElements
+        
+        // newElements is empty
+        var newElements = TestSequence<Int>(elements: [])
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements)
+        
+        // newElements is not empty and sut.residualCapacity is enough
+        // to store all new elements:
+        // then all sequence elements are appended to sut
+        var newElementsStorage = (1...sut.residualCapacity).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        newElements = TestSequence(elements: newElementsStorage)
+        sutPrevElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements + newElementsStorage)
+        
+        // newElements is not empty and sut residualCapacity is not enough
+        // to store all new elements:
+        // then only last m elements are stored, where m is the sut capacity
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).shuffled()
+        newElements = TestSequence(elements: newElementsStorage)
+        sutPrevElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, Array(newElementsStorage[(newElementsStorage.endIndex - sut.capacity)..<newElementsStorage.endIndex]))
+    }
+    
+    func testPushBackContentsOf_whenIsNotEmptyAndSequenceImplementsWithContiguousStorage() {
+        var sutPrevStoredElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+        
+        // newElements is empty, nothing happens:
+        sut.pushBack(contentsOf: [])
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements)
+        
+        // newElements is not empty and sut.residualCapacity is greater zero:
+        
+        // when newElements lenght is less than or equal to sut.residualCapacity, then all
+        // newElements get appended to sut:
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        var newElementsStorage = (11...20).shuffled()
+        XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+        var newElements = TestSequence(elements: newElementsStorage)
+        sutPrevStoredElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements + newElementsStorage)
+        // let's also do this test when sut storage wraps around
+        for headShift in 1..<19 {
+            sut = CircularBuffer(capacity: 20, matchingExactly: true)
+            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            sut.head = headShift
+            sut.count = 10
+            sut.tail = tail
+            XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+            newElements = TestSequence(elements: newElementsStorage)
+            sutPrevStoredElements = sut.allStoredElements
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements + newElementsStorage)
+        }
+        
+        // when newElements is not empty, and sut residual capacity is not enough to
+        // store all newElements, then sequence elements are sequentially appended to sut,
+        // while sut drops elements from its front to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).map { $0 * 2000 }
+        XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+        // here we'll just trump previously stored elements to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        var lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sutPrevStoredElements.count {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(sutPrevStoredElements[countOfTrumped..<sutPrevStoredElements.endIndex]) + newElementsStorage
+            newElements = TestSequence(elements: newElementsStorage)
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // From now on we'll have to trump all previously stored elements, and then
+        // also newly stored elements to keep making room for new elements
+        lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sut.capacity {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped))
+            newElements = TestSequence(elements: newElementsStorage)
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // we also do these tests when sut storage wraps around
+        for headShift in 1...19 {
+            newElementsStorage = (1...11).map { $0 * 2000 }
+            // here we'll just trump previously stored elements to make room for new elements:
+            for countOfTrumped in 1...10 {
+                XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+                sut = CircularBuffer(capacity: 20, matchingExactly: true)
+                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                sut.head = headShift
+                sut.count = 10
+                sut.tail = tail
+                sutPrevStoredElements = sut.allStoredElements
+                let expectedResult = Array(sutPrevStoredElements[countOfTrumped..<sutPrevStoredElements.endIndex]) + newElementsStorage
+                newElements = TestSequence(elements: newElementsStorage)
+                sut.pushBack(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+            // From now on we'll have to trump all previously stored elements, and then
+            // also newly stored elements to keep making room for new elements
+            lastNew = newElementsStorage.last!
+            for countOfTrumped in 1...sut.capacity {
+                sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+                sut.reserveCapacity(10, matchingExactlyCapacity: true)
+                let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped))
+                newElements = TestSequence(elements: newElementsStorage)
+                sut.pushBack(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+        }
+    }
+    
+    func testPushBackContentsOf_whenIsEmptyAndSequenceDoesntImplementWithContiguousStorage() {
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        var sutPrevElements = sut.allStoredElements
+        
+        // newElements is empty
+        var newElements = TestSequence<Int>(elements: [], implementsWithContiguousStorage: false)
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements)
+        
+        // newElements is not empty and sut.residualCapacity is enough
+        // to store all new elements:
+        // then all sequence elements are appended to sut
+        var newElementsStorage = (1...sut.residualCapacity).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements + newElementsStorage)
+        
+        // newElements is not empty and sut residualCapacity is not enough
+        // to store all new elements:
+        // then only last m elements are stored, where m is the sut capacity
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).shuffled()
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, Array(newElementsStorage[(newElementsStorage.endIndex - sut.capacity)..<newElementsStorage.endIndex]))
+    }
+    
+    func testPushBackContentsOf_whenIsNotEmptyAndSequenceDoesntImplementsWithContiguousStorage() {
+        var sutPrevStoredElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+        
+        // newElements is empty, nothing happens:
+        sut.pushBack(contentsOf: TestSequence(elements: [], implementsWithContiguousStorage: false))
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements)
+        
+        // newElements is not empty and sut.residualCapacity is greater zero:
+        
+        // when newElements lenght is less than or equal to sut.residualCapacity, then all
+        // newElements get appended to sut:
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        var newElementsStorage = (11...20).shuffled()
+        XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+        var newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevStoredElements = sut.allStoredElements
+        sut.pushBack(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements + newElementsStorage)
+        // let's also do this test when sut storage wraps around
+        for headShift in 1..<19 {
+            sut = CircularBuffer(capacity: 20, matchingExactly: true)
+            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            sut.head = headShift
+            sut.count = 10
+            sut.tail = tail
+            XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sutPrevStoredElements = sut.allStoredElements
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements + newElementsStorage)
+        }
+        
+        // when newElements is not empty, and sut residual capacity is not enough to
+        // store all newElements, then sequence elements are sequentially appended to sut,
+        // while sut drops elements from its front to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).map { $0 * 2000 }
+        XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+        // here we'll just trump previously stored elements to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        var lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sutPrevStoredElements.count {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(sutPrevStoredElements[countOfTrumped..<sutPrevStoredElements.endIndex]) + newElementsStorage
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // From now on we'll have to trump all previously stored elements, and then
+        // also newly stored elements to keep making room for new elements
+        lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sut.capacity {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped))
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sut.pushBack(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // we also do these tests when sut storage wraps around
+        for headShift in 1...19 {
+            newElementsStorage = (1...11).map { $0 * 2000 }
+            // here we'll just trump previously stored elements to make room for new elements:
+            for countOfTrumped in 1...10 {
+                XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+                sut = CircularBuffer(capacity: 20, matchingExactly: true)
+                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                sut.head = headShift
+                sut.count = 10
+                sut.tail = tail
+                sutPrevStoredElements = sut.allStoredElements
+                let expectedResult = Array(sutPrevStoredElements[countOfTrumped..<sutPrevStoredElements.endIndex]) + newElementsStorage
+                newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+                sut.pushBack(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+            // From now on we'll have to trump all previously stored elements, and then
+            // also newly stored elements to keep making room for new elements
+            lastNew = newElementsStorage.last!
+            for countOfTrumped in 1...sut.capacity {
+                sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+                sut.reserveCapacity(10, matchingExactlyCapacity: true)
+                let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped))
+                newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+                sut.pushBack(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
         }
     }
     
     // MARK: - push(_:) tests
-    func testPush_countIncreasesByOne() {
-        let prevCount = sut.count
-        sut.push(10)
-        XCTAssertEqual(sut.count, prevCount + 1)
+    func testPush() {
+        for i in 1...10 {
+            let prevCount = sut.count
+            let prevElements = sut.allStoredElements
+            sut.push(i)
+            XCTAssertEqual(sut.count, prevCount + 1)
+            XCTAssertEqual(sut.allStoredElements, ([i] + prevElements))
+            XCTAssertEqual(sut.first, i)
+        }
+        
+        // let's also do this test when storage wraps around
+        for headshift in 1...10 {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: (1...10).shuffled(), headShift: headshift)
+            let prevCount = sut.count
+            let prevElements = sut.allStoredElements
+            let newElement = headshift * 10
+            sut.push(newElement)
+            XCTAssertEqual(sut.count, prevCount + 1)
+            XCTAssertEqual(sut.allStoredElements, ([newElement] + prevElements))
+            XCTAssertEqual(sut.first, newElement)
+        }
     }
     
-    func testPush_newElementBecomesFirst() {
-        let prevFirst = sut.first
-        sut.append(10)
-        XCTAssertNotEqual(sut.first, prevFirst)
-        XCTAssertEqual(sut.first, 10)
-    }
-    
-    func testPush_whenFull_capacityGrows() {
-        whenFull()
-        let prevCapacity = sut.capacity
-        sut.push(10)
-        XCTAssertGreaterThan(sut.count, prevCapacity)
+    func testPush_whenIsFull() {
+        for k in 1...100 where CircularBuffer<Int>.smartCapacityFor(count: k) == k {
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            let prevCapacity = sut.capacity
+            sut.push(2000)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, prevCapacity << 1)
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1..<k {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                let prevCapacity = sut.capacity
+                sut.push(2000)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, prevCapacity << 1)
+            }
+        }
     }
     
     // MARK: - push(contentsOf:) tests
-    func testPushContentsOf() {
-        let newElements = AnySequence<Int>([])
-        sut.push(contentsOf: newElements)
+    func testPushContentsOf_whenSequenceImplementsWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.push(contentsOf: TestSequence(elements: newElements))
         XCTAssertTrue(sut.isEmpty)
         
-        let newElements1 = AnySequence<Int>(1...4)
-        sut.push(contentsOf: newElements1)
-        XCTAssertEqual(sut.count, 4)
-        XCTAssertEqual(sut.first, 4)
-        XCTAssertEqual(sut.last, 1)
-        for i in 0..<4 {
-            XCTAssertEqual(sut[i], 4 - i)
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.push(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements.reversed())
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.push(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.push(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
         }
         
-        let newElements2 = AnySequence<Int>(5...8)
-        sut.push(contentsOf: newElements2)
-        XCTAssertEqual(sut.count, 8)
-        XCTAssertEqual(sut.first, 8)
-        XCTAssertEqual(sut.last, 1)
-        for i in 0..<8 {
-            XCTAssertEqual(sut[i], (8 - i))
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.push(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.push(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
+        }
+    }
+    
+    func testPushContentsOf_whenSequenceDoesntImplementWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.push(contentsOf: AnySequence(newElements))
+        XCTAssertTrue(sut.isEmpty)
+        
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.push(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements.reversed())
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.push(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.push(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
         }
         
-        let newElements3 = SequenceImplementingWithContiguousStorage(base: [9, 10, 11, 12])
-        sut.push(contentsOf: newElements3)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 12)
-        XCTAssertEqual(sut.last, 1)
-        for i in 0..<8 {
-            XCTAssertEqual(sut[i], (12 - i))
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.push(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.push(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
         }
         
-        let empty1 = AnySequence<Int>([])
-        sut.push(contentsOf: empty1)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 12)
-        XCTAssertEqual(sut.last, 1)
-        for i in 0..<8 {
-            XCTAssertEqual(sut[i], (12 - i))
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
+        }
+        XCTAssertEqual(seq.underestimatedCount, 0)
+        sut = CircularBuffer(elements: sutElements)
+        sut.push(contentsOf: seq)
+        XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.push(contentsOf: seq)
+            XCTAssertEqual(sut.allStoredElements, newElements.reversed() + sutElements)
+        }
+    }
+    
+    func testPushContentsOf_whenIsFull() {
+        let newElements = (101...200).shuffled()
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
         }
         
-        let empty2 = SequenceImplementingWithContiguousStorage(base: [])
-        sut.push(contentsOf: empty2)
-        XCTAssertEqual(sut.count, 12)
-        XCTAssertEqual(sut.first, 12)
-        XCTAssertEqual(sut.last, 1)
-        for i in 0..<8 {
-            XCTAssertEqual(sut[i], (12 - i))
+        for k in 1...100 where CircularBuffer<Int>.smartCapacityFor(count: k) == k {
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            var prevCapacity = sut.capacity
+            // newElements implements withContiguousStorageIfAvailable
+            sut.push(contentsOf: newElements)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // newElements doesn't implement withContiguousStorageIfAvailable
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.push(contentsOf: AnySequence(newElements))
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.push(contentsOf: seq)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1..<k {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                // newElements implements withContiguousStorageIfAvailable
+                sut.push(contentsOf: newElements)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                // newElements doesn't implement withContiguousStorageIfAvailable
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.push(contentsOf: AnySequence(newElements))
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.push(contentsOf: seq)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            }
+        }
+    }
+    
+    func testPushContentsOf_whenResidualCapacityIsEnoughToStoreNewElements() {
+        let sutElements = (101...200).shuffled()
+        let newElementsStorage = (1..<(CircularBuffer<Int>.smartCapacityFor(count: sutElements.count) - sutElements.count)).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        
+        // sequence implements withContiguousStorageIfAvailable
+        var newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        var prevCapacity = sut.capacity
+        var prevSutElementsAddress = sut.elements
+        sut.push(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.push(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable and
+        // its underestimatedCount is zero despite it stores some elements
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.push(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // let's also do these tests when storage wraps around
+        for headShift in 1..<sutElements.count {
+            // sequence implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.push(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.push(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable and
+            // its underestimatedCount is zero despite it stores some elements
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.push(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
         }
     }
     
     // MARK: - prepend(contentsOf:) tests
-    func testPrependContentsOf_whenNewElementsIsEmpty_doesNothing() {
-        sut.prepend(contentsOf: [])
+    func testPrependContentsOf_whenSequenceImplementsWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.prepend(contentsOf: TestSequence(elements: newElements))
         XCTAssertTrue(sut.isEmpty)
         
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        sut.prepend(contentsOf: [])
-        XCTAssertEqual(sut.count, containedElements.count)
-        for i in 0..<sut.count {
-            XCTAssertEqual(sut[i], containedElements[i])
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.prepend(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements)
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.prepend(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.prepend(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
+        }
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.prepend(contentsOf: TestSequence(elements: newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.prepend(contentsOf: TestSequence(elements: newElements))
+            XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
         }
     }
     
-    func testPrependContentsOf_whenNewElementsCountIsGreaterThanZero_increasesCountByNewElementsCount() {
-        var prevCount = sut.count
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.prepend(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
-        
-        whenFull()
-        prevCount = sut.count
-        sut.prepend(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
-    }
-    
-    func testPrependContentsOf_whenNewElementsIsNotEmpty_newElementsGetPrepended() {
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.prepend(contentsOf: newElements)
-        var result = [Int]()
-        for i in 0..<sut.count {
-            result.append(sut[i])
-        }
-        XCTAssertEqual(result, newElements)
-        
-        whenFull()
-        let previousElements = containedElementsWhenFull()
-        sut.prepend(contentsOf: newElements)
-        result = sutContainedElements()
-        XCTAssertEqual(result, newElements + previousElements)
-    }
-    
-    func testPrependContentsOf_whenLeftCapacityIsSufficientToStoreNewElements() {
-        whenFull()
-        sut.append(5)
-        sut.append(6)
-        sut.append(7)
-        sut.append(8)
-        sut.append(9)
-        let newElements = [10, 11, 12, 13, 14, 15, 16]
-        XCTAssertGreaterThanOrEqual(sut.capacity - (sut.count + newElements.count), 0)
-        let prevElements = containedElementsWhenFull() + [5, 6, 7, 8, 9]
-        
-        sut.prepend(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevElements.count + newElements.count)
-        var result = sutContainedElements()
-        XCTAssertEqual(result, newElements + prevElements)
-        
-        // test for appending in splits
-        let copy = sut.copy()
-        for _ in 0..<newElements.count {
-            copy.popFirst()
-        }
-        XCTAssertGreaterThan(copy.head, 0)
-        XCTAssertEqual(copy.head, newElements.count)
-        copy.prepend(contentsOf: newElements)
-        XCTAssertEqual(copy.count, prevElements.count + newElements.count)
-        result.removeAll()
-        copy.forEach { result.append($0) }
-        XCTAssertEqual(result, newElements + prevElements)
-    }
-    
-    // MARK: - append<C: Collection>(contentsOf:) tests
-    func testAppendContentsOf_whenNewElementsIsEmpty_doesNothing() {
-        sut.append(contentsOf: [])
+    func testPrependContentsOf_whenSequenceDoesntImplementWithContiguousStorageIfAvailable() {
+        // sut isEmpty == true
+        // newElements.isEmpty == true
+        XCTAssertTrue(sut.isEmpty)
+        var newElements: Array<Int> = []
+        sut.prepend(contentsOf: AnySequence(newElements))
         XCTAssertTrue(sut.isEmpty)
         
-        whenFull()
-        let containedElements = containedElementsWhenFull()
-        sut.append(contentsOf: [])
-        XCTAssertEqual(sut.count, containedElements.count)
-        for i in 0..<sut.count {
-            XCTAssertEqual(sut[i], containedElements[i])
+        // sut isEmpty == true
+        // newElements.isEmpty == false
+        XCTAssertTrue(sut.isEmpty)
+        newElements = (1...100).shuffled()
+        sut.prepend(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements)
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == true
+        let sutElements = (101...200).shuffled()
+        sut = CircularBuffer(elements: sutElements)
+        newElements = []
+        sut.prepend(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.prepend(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, sutElements)
+        }
+        
+        // sut.isEmpty == false
+        // newElements.isEmpty == false
+        sut = CircularBuffer(elements: sutElements)
+        newElements = (1...100).shuffled()
+        sut.prepend(contentsOf: AnySequence(newElements))
+        XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.prepend(contentsOf: AnySequence(newElements))
+            XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
+        }
+        
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
+        }
+        XCTAssertEqual(seq.underestimatedCount, 0)
+        sut = CircularBuffer(elements: sutElements)
+        sut.prepend(contentsOf: seq)
+        XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
+        // let's also do this test when storage wraps around
+        for headShift in 1...sutElements.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            sut.prepend(contentsOf: seq)
+            XCTAssertEqual(sut.allStoredElements, newElements + sutElements)
         }
     }
     
-    func testAppendContentsOf_whenNewElementsCountIsGreaterThanZero_increasesCountByNewElementsCount() {
-        var prevCount = sut.count
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.append(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
+    func testPrependContentsOf_whenIsFull() {
+        let newElements = (101...200).shuffled()
+        // We're also gonna test with a sequence which returns 0 as
+        // its underestimatedCount value even if its lenght is greater than zero:
+        let seq = AnySequence { () -> AnyIterator<Int> in
+            var idx = 0
+            
+            return AnyIterator {
+                guard idx < newElements.count else { return nil }
+                
+                defer { idx += 1 }
+                
+                return newElements[idx]
+            }
+        }
         
-        whenFull()
-        prevCount = sut.count
-        sut.append(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
+        for k in 1...100 where CircularBuffer<Int>.smartCapacityFor(count: k) == k {
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            var prevCapacity = sut.capacity
+            // newElements implements withContiguousStorageIfAvailable
+            sut.prepend(contentsOf: newElements)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // newElements doesn't implement withContiguousStorageIfAvailable
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.prepend(contentsOf: AnySequence(newElements))
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            sut = CircularBuffer(elements: 1...k)
+            XCTAssertTrue(sut.isFull)
+            prevCapacity = sut.capacity
+            sut.prepend(contentsOf: seq)
+            XCTAssertGreaterThan(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            
+            // let's also do this test when storage wraps around
+            for headShift in 1..<k {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                // newElements implements withContiguousStorageIfAvailable
+                sut.prepend(contentsOf: newElements)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                // newElements doesn't implement withContiguousStorageIfAvailable
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.prepend(contentsOf: AnySequence(newElements))
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+                
+                sut = CircularBuffer.headShiftedInstance(contentsOf: Array(1...k), headShift: headShift)
+                XCTAssertTrue(sut.isFull)
+                prevCapacity = sut.capacity
+                sut.prepend(contentsOf: seq)
+                XCTAssertGreaterThan(sut.capacity, prevCapacity)
+                XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: k + newElements.count))
+            }
+        }
     }
     
-    func testAppendContentsOf_whenNewElementsIsNotEmpty_newElementsGetAppended() {
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.append(contentsOf: newElements)
-        var result = [Int]()
-        for i in 0..<sut.count {
-            result.append(sut[i])
-        }
-        XCTAssertEqual(result, newElements)
+    func testPrependContentsOf_whenResidualCapacityIsEnoughToStoreNewElements() {
+        let sutElements = (101...200).shuffled()
+        let newElementsStorage = (1..<(CircularBuffer<Int>.smartCapacityFor(count: sutElements.count) - sutElements.count)).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
         
-        whenFull()
-        let previousElements = containedElementsWhenFull()
-        sut.append(contentsOf: newElements)
-        result = sutContainedElements()
-        XCTAssertEqual(result, previousElements + newElements)
+        // sequence implements withContiguousStorageIfAvailable
+        var newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        var prevCapacity = sut.capacity
+        var prevSutElementsAddress = sut.elements
+        sut.prepend(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.prepend(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // sequence doesn't implements withContiguousStorageIfAvailable and
+        // its underestimatedCount is zero despite it stores some elements
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+        sut = CircularBuffer(elements: sutElements)
+        prevCapacity = sut.capacity
+        prevSutElementsAddress = sut.elements
+        sut.prepend(contentsOf: newElements)
+        XCTAssertEqual(sut.capacity, prevCapacity)
+        XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        
+        // let's also do these tests when storage wraps around
+        for headShift in 1..<sutElements.count {
+            // sequence implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: true, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.prepend(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: true)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.prepend(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+            
+            // sequence doesn't implements withContiguousStorageIfAvailable and
+            // its underestimatedCount is zero despite it stores some elements
+            sut = CircularBuffer.headShiftedInstance(contentsOf: sutElements, headShift: headShift)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false, underEstimatedCountMatchesCount: false)
+            prevCapacity = sut.capacity
+            prevSutElementsAddress = sut.elements
+            sut.prepend(contentsOf: newElements)
+            XCTAssertEqual(sut.capacity, prevCapacity)
+            XCTAssertEqual(sut.elements, prevSutElementsAddress)
+        }
     }
     
-    func testAppendContentsOf_whenLeftCapacityIsSufficientToStoreNewElements() {
-        whenLeftCapacityIsSeven()
-        let newElements = [10, 11, 12, 13, 14, 15, 16]
-        XCTAssertGreaterThanOrEqual(sut.capacity - (sut.count + newElements.count), 0)
-        let prevElements = containedElementsWhenLeftCapacityIsSeven()
+    // MARK: - pushFront(_:) tests
+    func testPushFront() {
+        sut = CircularBuffer(capacity: 0, matchingExactly: true)
+        // when capacity is 0 nothing happens:
+        XCTAssertEqual(sut.capacity, 0)
+        sut.pushFront(10)
+        XCTAssertEqual(sut.capacity, 0)
         
-        sut.append(contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevElements.count + newElements.count)
-        var result = sutContainedElements()
-        XCTAssertEqual(result, prevElements + newElements)
-        
-        // Test for appending in splits
-        let copy = sut.copy()
-        for _ in 0..<newElements.count - 2 {
-            copy.popLast()
+        // when residualCapacity is greater than 0, then element is stored as new first:
+        sut.reserveCapacity(5, matchingExactlyCapacity: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        let expectedCapacity = sut.capacity
+        var newElement = 1
+        var expectedResult: Array<Int> = []
+        while sut.residualCapacity > 0 {
+            expectedResult.insert(newElement, at: 0)
+            sut.pushFront(newElement)
+            XCTAssertEqual(sut.first, newElement)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            
+            newElement += 1
         }
-        copy.popFirst()
-        copy.popFirst()
-        XCTAssertEqual(copy.count, prevElements.count)
-        for i in 0..<prevElements.count {
-            copy[i] = prevElements[i]
-        }
-        XCTAssertGreaterThan(copy.tail + newElements.count, copy.capacity)
-        XCTAssertGreaterThanOrEqual(copy.capacity, copy.count + newElements.count)
         
-        copy.append(contentsOf:newElements)
-        result.removeAll()
-        copy.forEach({ result.append($0) })
-        XCTAssertEqual(result, prevElements + newElements)
+        // when residualCapacity is equal to 0, then element is stored as new first, and
+        // old first gets trumped:
+        XCTAssertEqual(sut.residualCapacity, 0)
+        newElement = 10
+        for i in 1...10 {
+            let _ = expectedResult.popLast()
+            expectedResult.insert(newElement, at: 0)
+            sut.pushFront(newElement)
+            XCTAssertEqual(sut.first, newElement)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            XCTAssertEqual(sut.capacity, expectedCapacity)
+            
+            newElement += i*10
+        }
+        
+        // let's also do these tests when storage wraps around
+        let preStored = (1...10).shuffled()
+        for headShift in 1..<preStored.count {
+            sut = CircularBuffer.headShiftedInstance(contentsOf: preStored, headShift: headShift)
+            sut.reserveCapacity(5, matchingExactlyCapacity: true)
+            XCTAssertGreaterThan(sut.residualCapacity, 0)
+            // when residual capacity is greater than zero, then element is stored at
+            // first position and elements previously stored don't get trumped:
+            var newElement = 1
+            while sut.residualCapacity > 0 {
+                let prevElements = sut.allStoredElements
+                sut.pushFront(newElement)
+                XCTAssertEqual(sut.allStoredElements, [newElement] + prevElements)
+                newElement += 1
+            }
+            XCTAssertEqual(sut.residualCapacity, 0)
+            // when residualCapacity is equal to 0, then element is stored as new first,
+            // and old last gets trumped:
+            expectedResult = sut.allStoredElements
+            for i in 1...sut.capacity {
+                newElement = i * 100
+                let _ = expectedResult.popLast()
+                expectedResult.insert(newElement, at: 0)
+                sut.pushFront(newElement)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
+        }
+    }
+    
+    // MARK: - pushFront(contentsOf:) tests
+    func testPushFrontContentsOf_whenCapacityIsZero() {
+        // nothing happens whether newElements contains elements or is empty:
+        sut = CircularBuffer(capacity: 0, matchingExactly: true)
+        XCTAssertTrue(sut.isEmpty)
+        sut.pushFront(contentsOf: [])
+        XCTAssertTrue(sut.isEmpty)
+        sut.pushFront(contentsOf: 1...10)
+        XCTAssertTrue(sut.isEmpty)
+    }
+    
+    func testPushFrontContentsOf_whenIsEmptyAndSequenceImplementsWithContiguousStorage() {
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        var sutPrevElements = sut.allStoredElements
+        
+        // newElements is empty
+        var newElements = TestSequence<Int>(elements: [])
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements)
+        
+        // newElements is not empty and sut.residualCapacity is enough
+        // to store all new elements:
+        // then all sequence elements are pushed at sut first:
+        var newElementsStorage = (1...sut.residualCapacity).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        newElements = TestSequence(elements: newElementsStorage)
+        sutPrevElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() + sutPrevElements)
+        
+        // newElements is not empty and sut residualCapacity is not enough
+        // to store all new elements:
+        // then only last m elements are stored, where m is the sut capacity
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).shuffled()
+        newElements = TestSequence(elements: newElementsStorage)
+        sutPrevElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, Array(newElementsStorage[(newElementsStorage.endIndex - sut.capacity)..<newElementsStorage.endIndex]).reversed())
+    }
+    
+    func testPushFrontContentsOf_whenIsNotEmptyAndSequenceImplementsWithContiguousStorage() {
+        var sutPrevStoredElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+        
+        // newElements is empty, nothing happens:
+        sut.pushFront(contentsOf: [])
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements)
+        
+        // newElements is not empty and sut.residualCapacity is greater zero:
+        
+        // when newElements lenght is less than or equal to sut.residualCapacity, then all
+        // newElements get pushed at sut first:
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        var newElementsStorage = (11...20).shuffled()
+        XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+        var newElements = TestSequence(elements: newElementsStorage)
+        sutPrevStoredElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() + sutPrevStoredElements)
+        // let's also do this test when sut storage wraps around
+        for headShift in 1..<19 {
+            sut = CircularBuffer(capacity: 20, matchingExactly: true)
+            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            sut.head = headShift
+            sut.count = 10
+            sut.tail = tail
+            XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+            newElements = TestSequence(elements: newElementsStorage)
+            sutPrevStoredElements = sut.allStoredElements
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() + sutPrevStoredElements)
+        }
+        
+        // when newElements is not empty, and sut residual capacity is not enough to
+        // store all newElements, then sequence elements are sequentially pushed
+        // at sut first,
+        // while sut drops elements from its back to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).map { $0 * 2000 }
+        XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+        // here we'll just trump previously stored elements to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        var lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sutPrevStoredElements.count {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = newElementsStorage.reversed() + Array(sutPrevStoredElements[0..<(sutPrevStoredElements.endIndex - countOfTrumped)])
+            newElements = TestSequence(elements: newElementsStorage)
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // From now on we'll have to trump all previously stored elements, and then
+        // also newly stored elements to keep making room for new elements
+        lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sut.capacity {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped).reversed())
+            newElements = TestSequence(elements: newElementsStorage)
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // we also do these tests when sut storage wraps around
+        for headShift in 1...19 {
+            newElementsStorage = (1...11).map { $0 * 2000 }
+            // here we'll just trump previously stored elements to make room for new elements:
+            for countOfTrumped in 1...10 {
+                XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+                sut = CircularBuffer(capacity: 20, matchingExactly: true)
+                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                sut.head = headShift
+                sut.count = 10
+                sut.tail = tail
+                sutPrevStoredElements = sut.allStoredElements
+                let expectedResult = newElementsStorage.reversed() + Array(sutPrevStoredElements[0..<(sutPrevStoredElements.endIndex - countOfTrumped)])
+                newElements = TestSequence(elements: newElementsStorage)
+                sut.pushFront(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+            // From now on we'll have to trump all previously stored elements, and then
+            // also newly stored elements to keep making room for new elements
+            lastNew = newElementsStorage.last!
+            for countOfTrumped in 1...sut.capacity {
+                sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+                sut.reserveCapacity(10, matchingExactlyCapacity: true)
+                let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped).reversed())
+                newElements = TestSequence(elements: newElementsStorage)
+                sut.pushFront(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+        }
+    }
+    
+    func testPushFrontContentsOf_whenIsEmptyAndSequenceDoesntImplementWithContiguousStorage() {
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        var sutPrevElements = sut.allStoredElements
+        
+        // newElements is empty
+        var newElements = TestSequence<Int>(elements: [], implementsWithContiguousStorage: false)
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, sutPrevElements)
+        
+        // newElements is not empty and sut.residualCapacity is enough
+        // to store all new elements:
+        // then all sequence elements are pushed to sut
+        var newElementsStorage = (1...sut.residualCapacity).shuffled()
+        XCTAssertFalse(newElementsStorage.isEmpty)
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() +  sutPrevElements)
+        
+        // newElements is not empty and sut residualCapacity is not enough
+        // to store all new elements:
+        // then only last m elements are stored, where m is the sut capacity
+        sut = CircularBuffer(capacity: 10, matchingExactly: true)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).shuffled()
+        newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, Array(newElementsStorage[(newElementsStorage.endIndex - sut.capacity)..<newElementsStorage.endIndex]).reversed())
+    }
+    
+    func testPushFrontContentsOf_whenIsNotEmptyAndSequenceDoesntImplementsWithContiguousStorage() {
+        var sutPrevStoredElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+        
+        // newElements is empty, nothing happens:
+        sut.pushFront(contentsOf: TestSequence(elements: [], implementsWithContiguousStorage: false))
+        XCTAssertEqual(sut.allStoredElements, sutPrevStoredElements)
+        
+        // newElements is not empty and sut.residualCapacity is greater zero:
+        
+        // when newElements lenght is less than or equal to sut.residualCapacity, then all
+        // newElements get pushed at sut first:
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        var newElementsStorage = (11...20).shuffled()
+        XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+        var newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+        sutPrevStoredElements = sut.allStoredElements
+        sut.pushFront(contentsOf: newElements)
+        XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() + sutPrevStoredElements)
+        // let's also do this test when sut storage wraps around
+        for headShift in 1..<19 {
+            sut = CircularBuffer(capacity: 20, matchingExactly: true)
+            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            sut.head = headShift
+            sut.count = 10
+            sut.tail = tail
+            XCTAssertGreaterThanOrEqual(sut.residualCapacity, newElementsStorage.count)
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sutPrevStoredElements = sut.allStoredElements
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, newElementsStorage.reversed() + sutPrevStoredElements)
+        }
+        
+        // when newElements is not empty, and sut residual capacity is not enough to
+        // store all newElements, then sequence elements are sequentially
+        // pushed at sut front, while sut drops elements from its back
+        // to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        sut.reserveCapacity(10, matchingExactlyCapacity: true)
+        newElementsStorage = (1...(sut.residualCapacity + 1)).map { $0 * 2000 }
+        XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+        // here we'll just trump previously stored elements to make room for new elements:
+        sutPrevStoredElements = sut.allStoredElements
+        var lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sutPrevStoredElements.count {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = newElementsStorage.reversed() + Array(sutPrevStoredElements[0..<(sutPrevStoredElements.endIndex - countOfTrumped)])
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // From now on we'll have to trump all previously stored elements, and then
+        // also newly stored elements to keep making room for new elements
+        lastNew = newElementsStorage.last!
+        for countOfTrumped in 1...sut.capacity {
+            sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+            sut.reserveCapacity(10, matchingExactlyCapacity: true)
+            let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped).reversed())
+            newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+            sut.pushFront(contentsOf: newElements)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
+            
+            newElementsStorage.append(lastNew + 1)
+            lastNew = newElementsStorage.last!
+        }
+        
+        // we also do these tests when sut storage wraps around
+        for headShift in 1...19 {
+            newElementsStorage = (1...11).map { $0 * 2000 }
+            // here we'll just trump previously stored elements to make room for new elements:
+            for countOfTrumped in 1...10 {
+                XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
+                sut = CircularBuffer(capacity: 20, matchingExactly: true)
+                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                sut.head = headShift
+                sut.count = 10
+                sut.tail = tail
+                sutPrevStoredElements = sut.allStoredElements
+                let expectedResult = newElementsStorage.reversed() + Array(sutPrevStoredElements[0..<(sutPrevStoredElements.endIndex - countOfTrumped)])
+                newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+                sut.pushFront(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+            // From now on we'll have to trump all previously stored elements, and then
+            // also newly stored elements to keep making room for new elements
+            lastNew = newElementsStorage.last!
+            for countOfTrumped in 1...sut.capacity {
+                sut = CircularBuffer(elements: sutPrevStoredElements, capacityMatchesExactlyCount: true)
+                sut.reserveCapacity(10, matchingExactlyCapacity: true)
+                let expectedResult = Array(newElementsStorage.dropFirst(countOfTrumped).reversed())
+                newElements = TestSequence(elements: newElementsStorage, implementsWithContiguousStorage: false)
+                sut.pushFront(contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+                
+                newElementsStorage.append(lastNew + 1)
+                lastNew = newElementsStorage.last!
+            }
+        }
     }
     
     // MARK: - insertAt(index:ContentsOf:)
-    func testInsertAt_whenNewElementsIsEmpty_doesNothing() {
+    func testInsertAt_whenNewElementsIsEmpty() {
         XCTAssertEqual(sut.count, 0)
         sut.insertAt(index: sut.count, contentsOf: [])
         XCTAssertTrue(sut.isEmpty)
         
-        whenFull()
-        let containedElements = containedElementsWhenFull()
+        sut = CircularBuffer(elements: 1...4)
+        let containedElements = sut.allStoredElements
         for i in 0...sut.count {
             sut.insertAt(index: i, contentsOf: [])
             XCTAssertEqual(sut.count, containedElements.count)
@@ -343,90 +1585,81 @@ final class AddElementsOperationsTests: XCTestCase {
                 XCTAssertEqual(sut[j], containedElements[j])
             }
             // restore SUT state for next iteration:
-            whenFull()
+            sut = CircularBuffer(elements: 1...4)
         }
     }
     
-    func test_insertAt_whenNewElementsCountIsGreaterThanZero_increasesCountByNewElementsCount() {
-        var prevCount = sut.count
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.insertAt(index: 0, contentsOf: newElements)
-        XCTAssertEqual(sut.count, prevCount + newElements.count)
-        
-        whenFull()
+    func test_insertAt_whenNewElementsIsNotEmpty() {
+        let newElements = 10...50
+        sut = CircularBuffer(elements: 1...4)
         for i in 0...sut.count {
-            prevCount = sut.count
+            var expectedResult = sut.allStoredElements
+            expectedResult.insert(contentsOf: newElements, at: i)
             sut.insertAt(index: i, contentsOf: newElements)
-            XCTAssertEqual(sut.count, prevCount + newElements.count)
+            XCTAssertEqual(sut.allStoredElements, expectedResult)
             
             // restore SUT state for next iteration:
-            whenFull()
+            sut = CircularBuffer(elements: 1...4)
         }
-    }
-    
-    func testInsertAt__whenNewElementsIsNotEmpty_newElementsGetAppended() {
-        XCTAssertEqual(sut.count, 0)
-        let newElements = [5, 6, 7, 8 ,9, 10]
-        sut.insertAt(index: sut.count, contentsOf: newElements)
-        var result = sutContainedElements()
-        XCTAssertEqual(result, newElements)
         
-        whenFull()
-        let previousElements = containedElementsWhenFull()
-        for i in 0...sut.count {
-            sut.insertAt(index: i, contentsOf: newElements)
-            result = sutContainedElements()
-            let expectedResult = Array(previousElements[0..<i] + newElements + Array(previousElements[i..<previousElements.endIndex]))
-            XCTAssertEqual(result, expectedResult)
-            
-            // restore SUT state for next iteration:
-            whenFull()
+        // Let's do the same test when storage wraps around:
+        for headShift in 1...4 {
+            for i in 0...4 {
+                sut = CircularBuffer.headShiftedInstance(contentsOf: (1...4).shuffled(), headShift: headShift)
+                var expectedResult = sut.allStoredElements
+                expectedResult.insert(contentsOf: newElements, at: i)
+                sut.insertAt(index: i, contentsOf: newElements)
+                XCTAssertEqual(sut.allStoredElements, expectedResult)
+            }
         }
     }
     
     func testInsertAt_whenLeftCapacityIsSufficientToStoreNewElements() {
-        whenLeftCapacityIsSeven()
-        let newElements = [10, 11, 12, 13, 14, 15, 16]
-        XCTAssertGreaterThanOrEqual(sut.capacity - (sut.count + newElements.count), 0)
-        let prevElements = containedElementsWhenLeftCapacityIsSeven()
-        
-        var result = [Int]()
-        for i in 0...sut.count {
+        sut = CircularBuffer(elements: 1...5)
+        XCTAssertGreaterThan(sut.residualCapacity, 0)
+        let newElements = (1...sut.residualCapacity).map { $0 * 10 }
+        for i in 0..<sut.count {
+            let prevSutElementsBaseAddress = sut.elements
             sut.insertAt(index: i, contentsOf: newElements)
-            XCTAssertEqual(sut.count, prevElements.count + newElements.count)
-            result = sutContainedElements()
-            let expectedResult = Array(prevElements[0..<i]) + newElements + Array(prevElements[i..<prevElements.endIndex])
-            XCTAssertEqual(result, expectedResult)
-            XCTAssertTrue(sut.isFull)
-            XCTAssertEqual(sut[sut.count - 1], sut.last, "Iteration: \(i)")
+            XCTAssertEqual(sut.elements, prevSutElementsBaseAddress)
             
             // restore SUT state for next iteration:
-            whenLeftCapacityIsSeven()
-            // restore result:
-            result.removeAll()
+            sut = CircularBuffer(elements: 1...5)
         }
-        
-        // Test for appending in splits
-        let copy = sut.copy()
-        copy.append(contentsOf: newElements)
-        for _ in 0..<newElements.count - 2 {
-            copy.popLast()
-        }
-        copy.popFirst()
-        copy.popFirst()
-        XCTAssertEqual(copy.count, prevElements.count)
-        for i in 0..<prevElements.count {
-            copy[i] = prevElements[i]
-        }
-        XCTAssertGreaterThan(copy.tail + newElements.count, copy.capacity)
-        XCTAssertGreaterThanOrEqual(copy.capacity, copy.count + newElements.count)
-        
-        copy.insertAt(index: 2, contentsOf: newElements)
-        result.removeAll()
-        copy.forEach { result.append($0) }
-        let expectedResult = Array(prevElements[0..<2] + newElements + Array(prevElements[2..<prevElements.endIndex]))
-        XCTAssertEqual(result, expectedResult)
-        XCTAssertEqual(sut[sut.count - 1], sut.last)
     }
-    */
+}
+
+struct TestSequence<Element>: Sequence {
+    let containedElements: [Element]
+    
+    let implementsWithContiguousStorage: Bool
+    
+    let underEstimatedCountMatchesCount: Bool
+    
+    init(elements: [Element], implementsWithContiguousStorage: Bool = true, underEstimatedCountMatchesCount: Bool = true) {
+        self.containedElements = elements
+        self.implementsWithContiguousStorage = implementsWithContiguousStorage
+        self.underEstimatedCountMatchesCount = underEstimatedCountMatchesCount
+    }
+    
+    var underestimatedCount: Int { return underEstimatedCountMatchesCount ? containedElements.count : 0 }
+    
+    func makeIterator() -> AnyIterator<Element> {
+        var idx = 0
+        
+        return AnyIterator {
+            guard idx < containedElements.count else { return nil }
+            
+            defer { idx += 1 }
+            
+            return containedElements[idx]
+        }
+    }
+    
+    func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
+        guard implementsWithContiguousStorage else { return nil }
+        
+        return try containedElements.withUnsafeBufferPointer(body)
+    }
+    
 }

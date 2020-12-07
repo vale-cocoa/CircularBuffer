@@ -232,7 +232,7 @@ public final class CircularBuffer<Element> {
     public var last: Element? {
         guard !isEmpty else { return nil }
         
-        return elements.advanced(by: decrementIndex(tail)).pointee
+        return elements.advanced(by: decrementBufferIndex(tail)).pointee
     }
     
     // MARK: - Subscript
@@ -300,7 +300,7 @@ public final class CircularBuffer<Element> {
         
         copy.count = count
         copy.head = 0
-        copy.tail = copy.incrementIndex(copy.count - 1)
+        copy.tail = copy.incrementBufferIndex(copy.count - 1)
         
         return copy
     }

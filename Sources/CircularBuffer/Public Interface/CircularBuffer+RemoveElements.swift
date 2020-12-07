@@ -32,17 +32,17 @@ extension CircularBuffer {
         guard !self.isEmpty else { return nil }
         
         defer {
-            reduceSmartCapacityForCurrentElementsCount()
+            reduceCapacityForCurrentCount(usingSmartCapacityPolicy: true)
         }
         
         let element = elements.advanced(by: head).move()
-        head = incrementIndex(head)
+        head = incrementBufferIndex(head)
         count -= 1
         
         return element
     }
     
-    /// Removes and returns —if present— the element stored at first position, keeping the capacity intact.
+    /// Removes and returns —if present— the element stored at first position, without reducing the storage capacity.
     ///
     /// - Returns: `first` element.
     /// - Complexity: O(1)
@@ -52,7 +52,7 @@ extension CircularBuffer {
         
         let firstElement = elements.advanced(by: head).move()
         defer {
-            head = incrementIndex(head)
+            head = incrementBufferIndex(head)
             count -= 1
         }
         
@@ -70,15 +70,15 @@ extension CircularBuffer {
     public func popLast() -> Element? {
         guard !self.isEmpty else { return nil }
         
-        tail = decrementIndex(tail)
+        tail = decrementBufferIndex(tail)
         let element = elements.advanced(by: tail).move()
         count -= 1
-        reduceSmartCapacityForCurrentElementsCount()
+        reduceCapacityForCurrentCount(usingSmartCapacityPolicy: true)
         
         return element
     }
     
-    /// Removes and returns —if present— the element stored at last position, keeping the capacity intact.
+    /// Removes and returns —if present— the element stored at last position, without reducing the storage capacity.
     ///
     /// - Returns: `last` element.
     /// - Complexity: O(1)
@@ -86,15 +86,19 @@ extension CircularBuffer {
     public func popBack() -> Element? {
         guard !isEmpty else { return nil }
         
-        tail = decrementIndex(tail)
+        tail = decrementBufferIndex(tail)
         let lastElement = elements.advanced(by: tail).move()
         count -= 1
         
         return lastElement
     }
     
-    /// Removes and returns first *k* number of elements from the storage. Eventually reduces the buffer capacity when
-    /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
+    /// Removes and returns first *k* number of elements from the storage.
+    /// Eventually reduces the buffer capacity at the end of the removal operation,
+    /// by specifying a value of `true` as `keepCapacity` parameter value.
+    /// The capacity resizing will be done by adopting the smart capacity policy
+    /// if `true` is specified as `usingSmartCapacityPolicy` value, otherwise
+    /// it will match the `count` value of the calle at the end of the removal operation.
     ///
     /// - Parameter _:  An `Int` value representing the *k* number of elements to remove from the
     ///                 head of the storage.
@@ -104,50 +108,54 @@ extension CircularBuffer {
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   Boolean value, when specifying `true` as its value,
+    ///                                         then the smart capacity policy is adopted for resizing the
+    ///                                         storage; otherwise when `false`, then the resizing
+    ///                                         of the storage will match exactly the count of elements after
+    ///                                         the removal operation has taken effect.
+    ///                                         **Defaults to true**.
     /// - Returns: An `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Note: The `usingSmartCapacityPolicy` flag value has effect only when
+    ///         `keepCapacity` specified value is `false`.
+    ///         Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with a value equals to `count` as *k* elements to remove,
     ///         and `true` as `keepCapacity` value, all elements will be removed from the storage,
-    ///         and its capacity will be reduced to the minimum possible one.
+    ///         and its capacity will be reduced to the minimum.
     @discardableResult
-    public func removeFirst(_ k: Int, keepCapacity: Bool = true) -> [Element] {
+    public func removeFirst(_ k: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> [Element] {
         precondition(k >= 0 && k <= count, "operation not permitted with given count value")
         guard
             k < count
-        else { return removeAll(keepCapacity: keepCapacity) }
+        else { return removeAll(keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy) }
         
+        let newCount = count - k
+        let newCapacity = capacityFor(newCount: newCount, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         guard k > 0 else {
             defer {
-                if !keepCapacity {
-                    reduceSmartCapacityForCurrentElementsCount()
+                if newCapacity < capacity {
+                    fastResizeElements(to: newCapacity)
                 }
             }
             
             return []
         }
         
-        let removed = UnsafeMutablePointer<Element>.allocate(capacity: k)
-        moveInitializeFromElements(advancedToBufferIndex: head, count: k, to: removed)
-        
-        defer {
-            head = head + k > capacity ? incrementIndex(k - (capacity - head) - 1) : incrementIndex(head + k - 1)
-            count -= k
-            tail = incrementIndex(head + count - 1)
-            if !keepCapacity {
-                reduceSmartCapacityForCurrentElementsCount()
-            }
+        if newCapacity == capacity {
+            
+            return fastInPlaceRemoveFirstElements(k)
+        } else {
+            
+            return fastResizeElements(to: newCapacity, removingAt: 0, count: k)
         }
-        
-        let result = Array<Element>(UnsafeBufferPointer(start: removed, count: k))
-        removed.deinitialize(count: k)
-        removed.deallocate()
-        
-        return result
     }
     
-    /// Removes and returns last *k* number of elements from the storage. Eventually reduces the buffer capacity when
-    /// specified in the callee by giving a value of `true` as `keepCapacity` parameter value.
+    /// Removes and returns last *k* number of elements from the storage.
+    /// Eventually reduces the buffer capacity at the end of the removal operation,
+    /// by specifying a value of `true` as `keepCapacity` parameter value.
+    /// The capacity resizing will be done by adopting the smart capacity policy
+    /// if `true` is specified as `usingSmartCapacityPolicy` value, otherwise
+    /// it will match the `count` value of the calle at the end of the removal operation.
     ///
     /// - Parameter _:  An `Int` value representing the *k* number of elements to remove from the tail
     ///                 of the storage.
@@ -157,49 +165,55 @@ extension CircularBuffer {
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   Boolean value, when specifying `true` as its value,
+    ///                                         then the smart capacity policy is adopted for resizing the
+    ///                                         storage; otherwise when `false`, then the resizing
+    ///                                         of the storage will match exactly the count of elements after
+    ///                                         the removal operation has taken effect.
+    ///                                         **Defaults to true**.
     /// - Returns: An `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Note: The `usingSmartCapacityPolicy` flag value has effect only when
+    ///         `keepCapacity` specified value is `false`.
+    ///         Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with a value equals to `count` as *k* elements to remove,
     ///         and `true` as `keepCapacity` value, all elements will be removed from the storage,
     ///         and its capacity will be reduced to the minimum possible one.
     @discardableResult
-    public func removeLast(_ k: Int, keepCapacity: Bool = true) -> [Element] {
+    public func removeLast(_ k: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> [Element] {
         precondition(k >= 0 && k <= count, "operation not permitted with given count value")
-        guard k < count else { return removeAll(keepCapacity: keepCapacity) }
+        guard
+            k < count
+        else { return removeAll(keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy) }
         
+        let newCount = count - k
+        let newCapacity = capacityFor(newCount: newCount, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         guard k > 0 else {
             defer {
-                if !keepCapacity {
-                    reduceSmartCapacityForCurrentElementsCount()
+                if newCapacity < capacity {
+                    fastResizeElements(to: newCapacity)
                 }
             }
             
             return []
         }
         
-        let removed = UnsafeMutablePointer<Element>.allocate(capacity: k)
-        let buffIdxStart = tail - k < 0 ? capacity - k - tail : tail - k
-        moveInitializeFromElements(advancedToBufferIndex: buffIdxStart, count: k, to: removed)
-        
-        defer {
-            count -= k
-            tail = buffIdxStart
-            if !keepCapacity {
-                reduceSmartCapacityForCurrentElementsCount()
-            }
+        if newCapacity == capacity {
+            
+            return fastInPlaceRemoveLastElements(k)
+        } else {
+            
+            return fastResizeElements(to: newCapacity, removingAt: count - k, count: k)
         }
-        
-        let result = Array<Element>(UnsafeBufferPointer(start: removed, count: k))
-        removed.deinitialize(count: k)
-        removed.deallocate()
-        
-        return result
     }
     
     /// Removes and returns *k* number of elements from the storage starting from the one at the given `index`
-    /// parameter. Eventually reduces the buffer capacity when specified in the callee by giving a value of `true` as
-    /// `keepCapacity` parameter value.
+    /// parameter.
+    /// Eventually reduces the buffer capacity at the end of the removal operation,
+    /// by specifying a value of `true` as `keepCapacity` parameter value.
+    /// The capacity resizing will be done by adopting the smart capacity policy
+    /// if `true` is specified as `usingSmartCapacityPolicy` value, otherwise
+    /// it will match the `count` value of the calle at the end of the removal operation.
     ///
     /// - Parameter index:  An `Int` value representing the position where to start the removal.
     ///                     Must be a valid subscript index: hence greater than or equal `zero`
@@ -214,126 +228,78 @@ extension CircularBuffer {
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   Boolean value, when specifying `true` as its value,
+    ///                                         then the smart capacity policy is adopted for resizing the
+    ///                                         storage; otherwise when `false`, then the resizing
+    ///                                         of the storage will match exactly the count of elements after
+    ///                                         the removal operation has taken effect.
+    ///                                         **Defaults to true**.
     /// - Returns:  An `Array` containing the removed elements, in the same order as they were inside the storage.
-    /// - Note: Calling this method with `0` as *k* elements to remove and `true` as `keepCapacity` value,
+    /// - Note: The `usingSmartCapacityPolicy` flag value has effect only when
+    ///         `keepCapacity` specified value is `false`.
+    ///         Calling this method with `0` as *k* elements to remove and `false` as `keepCapacity` value,
     ///         will result in not removing any stored element, but in possibly reducing the capacity of the storage.
     ///         On the other hand, when calling it with an `index` value of `0`,
     ///         a value equals to `count` as *k* elements to remove, and `true` as `keepCapacity` value,
     ///         all elements will be removed from the storage, and its capacity will be reduced
     ///         to the minimum possible one.
     @discardableResult
-    public func removeAt(index: Int, count k: Int, keepCapacity: Bool = true) -> [Element] {
+    public func removeAt(index: Int, count k: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> [Element] {
         checkSubscriptBounds(for: index)
         precondition(k >= 0 && k <= count - index, "operation not permitted with given count value")
-        guard index != 0 else { return removeFirst(k, keepCapacity: keepCapacity) }
+        guard index != 0 else { return removeFirst(k, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy) }
         
-        guard index != count - 1 else { return removeLast(k, keepCapacity: keepCapacity) }
+        guard index != count - 1 else { return removeLast(k, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy) }
         
+        let newCount = count - k
+        let newCapacity = capacityFor(newCount: newCount, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         guard k > 0 else {
             defer {
-                if !keepCapacity {
-                    reduceSmartCapacityForCurrentElementsCount()
+                if newCapacity < capacity {
+                    fastResizeElements(to: newCapacity)
                 }
             }
             
             return []
         }
         
-        let removed = UnsafeMutablePointer<Element>.allocate(capacity: k)
-        
-        // Get the real buffer index from given index:
-        let buffIdx = bufferIndex(from: index)
-        
-        // move elements to remove, obtaining the buffer index from where some elements
-        // might remain:
-        let bufIdxOfSecondSplit = moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: k, to: removed)
-        
-        // We defer the shifting of remaining elements/rejoining in a smaller buffer
-        // operation after we have returned the removed elements
-        defer {
-            // Check if we ought move remaining elements to a smaller buffer, or if we
-            // ought shift them inside the actual buffer to occupy the space left by
-            //the removal:
-            let newCapacity = keepCapacity ? capacity : Self.smartCapacityFor(count: count - k)
-            if newCapacity < capacity {
-                // Let's move remaining elements to a smaller buffer…
-                let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
-                
-                // Remaining elements could be placed in two splits of current buffer:
-                let countOfFirstSplit = index
-                let countOfSecondSplit = count - index - k
-                
-                // move into newBuff first split of _elements
-                if countOfFirstSplit > 0 {
-                    moveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuff)
-                }
-                
-                // move into newBuff second split of _elements
-                if countOfSecondSplit > 0 {
-                    moveInitializeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfSecondSplit, to: newBuff.advanced(by: countOfFirstSplit))
-                }
-                
-                // Apply the change of buffer:
-                elements.deallocate()
-                elements = newBuff
-                
-                // update _capacity, _head, _elementsCount and _tail to new values
-                capacity = newCapacity
-                head = 0
-                count -= k
-                tail = incrementIndex(count - 1)
-            } else {
-                // _capacity stays the same.
-                // We have to eventually shift up remaining elements placed after the
-                // removed ones:
-                let countOfElementsToShift = count - index - k
-                let lastBufIdx: Int!
-                if countOfElementsToShift > 0 {
-                    // There are some remaining elements in the buffer, occupying positions
-                    // below the removed ones.
-                    // Let's first move them out _elements:
-                    let swap = UnsafeMutablePointer<Element>.allocate(capacity: countOfElementsToShift)
-                    moveInitializeFromElements(advancedToBufferIndex: bufIdxOfSecondSplit, count: countOfElementsToShift, to: swap)
-                    
-                    // then back in _elements at the index where the removal started,
-                    // obtaining also the buffer index for recalculating the _tail:
-                    lastBufIdx = moveInitializeToElements(advancedToBufferIndex: buffIdx, from: swap, count: countOfElementsToShift)
-                    swap.deallocate()
-                } else {
-                    // The removal ended up to the last element, hence the buffer index
-                    // for calculating the new _tail is the one obtained from the removal.
-                    lastBufIdx = bufIdxOfSecondSplit
-                }
-                
-                // Update _elementsCount and _tail to the newValues:
-                count -= k
-                tail = incrementIndex(lastBufIdx - 1)
-            }
+        if newCapacity == capacity {
+            
+            return fastInPlaceRemoveElements(at: index, count: k)
+        } else {
+            
+            return fastResizeElements(to: newCapacity, removingAt: index, count: k)
         }
-        
-        let result = Array(UnsafeBufferPointer(start: removed, count: k))
-        removed.deinitialize(count: k)
-        removed.deallocate()
-        
-        return result
     }
     
     /// Removes and returns all elements stored in the same order as they were stored in the storage.
-    /// Eventually reduces the buffer capacity when specified in the callee by giving a value of `true` as
-    /// `keepCapacity` parameter value.
+    /// Eventually reduces the buffer capacity at the end of the removal operation,
+    /// by specifying a value of `true` as `keepCapacity` parameter value.
+    /// The capacity resizing will be done by adopting the smart capacity policy
+    /// if `true` is specified as `usingSmartCapacityPolicy` value, otherwise
+    /// it will match the `count` value of the calle at the end of the removal operation.
     ///
     /// - Parameter keepCapacity:   Boolean value, when `true` is specified then
     ///                             the storage capacity gets eventually reduced at the end of removal; otherwise
     ///                             when set to `false`, storage capacity doesn't get reduced after the
     ///                             elements removal.
     ///                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   Boolean value, when specifying `true` as its value,
+    ///                                         then the smart capacity policy is adopted for resizing the
+    ///                                         storage; otherwise when `false`, then the resizing
+    ///                                         of the storage will match exactly the count of elements after
+    ///                                         the removal operation has taken effect.
+    ///                                         **Defaults to true**.
     /// - Returns:  An `Array` containing the removed elements, in the same order as they were
     ///             stored inside the storage.
+    /// - Note: The `usingSmartCapacityPolicy` flag value has effect only when
+    ///         `keepCapacity` specified value is `false`.
     @discardableResult
-    public func removeAll(keepCapacity: Bool = true) -> [Element] {
+    public func removeAll(keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> [Element] {
         defer {
-            if !keepCapacity && capacity > Self.minSmartCapacity {
-                self.capacity = Self.minSmartCapacity
+            let minCapacity = usingSmartCapacityPolicy ? Self.minSmartCapacity : 0
+            if !keepCapacity && capacity > minCapacity {
+                self.capacity = minCapacity
                 self.elements.deallocate()
                 self.elements = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                 head = 0

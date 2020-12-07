@@ -151,7 +151,7 @@ extension CircularBuffer {
                 guard topIdx < bottomIdx else { break INNERBOTTOM }
             }
             if countToDeinitialize > 0 {
-                let buffIdxStartToDeinit = incrementIndex(buffIdx)
+                let buffIdxStartToDeinit = incrementBufferIndex(buffIdx)
                 deinitializeElements(advancedToBufferIndex: buffIdxStartToDeinit, count: countToDeinitialize)
                 newCount -= countToDeinitialize
                 if let oldNewLast = newLast {
@@ -159,7 +159,7 @@ extension CircularBuffer {
                     let temp = UnsafeMutablePointer<Element>.allocate(capacity: countToMove)
                     let bottomStartBuffIdx = bufferIndex(from: bottomIdx + 1 + countToDeinitialize)
                     moveInitializeFromElements(advancedToBufferIndex: bottomStartBuffIdx, count: countToMove, to: temp)
-                    let reInsertBuffIdx = incrementIndex(buffIdx)
+                    let reInsertBuffIdx = incrementBufferIndex(buffIdx)
                     moveInitializeToElements(advancedToBufferIndex: reInsertBuffIdx, from: temp, count: countToMove)
                     newLast = oldNewLast - countToDeinitialize
                 } else {
@@ -169,7 +169,7 @@ extension CircularBuffer {
             } else if newLast == nil {
                 newLast = bottomStart
             }
-            newTailBuffIdx = incrementIndex(bufferIndex(from: newLast!))
+            newTailBuffIdx = incrementBufferIndex(bufferIndex(from: newLast!))
             topIdx += topIdx == topStart ? 1 : 0
             bottomIdx -= bottomIdx == bottomStart ? 1 : 0
             buffIdx = bufferIndex(from: topIdx)

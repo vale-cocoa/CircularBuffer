@@ -21,13 +21,13 @@
 // MARK: - Specific interface for tests and debug only
 #if DEBUG
 extension CircularBuffer {
-    static func headShiftedInstance(contentsOf elements: [Element], headShift: Int) -> CircularBuffer {
+    static func headShiftedInstance(contentsOf containedElements: [Element], headShift: Int) -> CircularBuffer {
         precondition(headShift > 0, "Head shift must be greater than 0")
-        let minSmartCapacity = headShift >= elements.count ? smartCapacityFor(count: elements.count + 1) : smartCapacityFor(count: elements.count)
+        let minSmartCapacity = headShift >= containedElements.count ? smartCapacityFor(count: containedElements.count + 1) : smartCapacityFor(count: containedElements.count)
         let result = CircularBuffer(capacity: minSmartCapacity)
-        result.tail = result.initializeElements(advancedToBufferIndex: headShift, from: elements)
+        result.tail = result.initializeElements(advancedToBufferIndex: headShift, from: containedElements)
         result.head = headShift
-        result.count = elements.count
+        result.count = containedElements.count
         
         return result
     }

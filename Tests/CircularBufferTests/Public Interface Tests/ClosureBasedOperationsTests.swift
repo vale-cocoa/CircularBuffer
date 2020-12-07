@@ -227,7 +227,7 @@ final class ClosureBasedOperationsTests: XCTestCase {
             sut.removeAll(where: isEvenPredicate)
             XCTAssertEqual(sut.allStoredElements, elements)
             XCTAssertEqual(sut.head, headShift)
-            let expectedTail = sut.incrementIndex(sut.bufferIndex(from: sut.count - 1))
+            let expectedTail = sut.incrementBufferIndex(sut.bufferIndex(from: sut.count - 1))
             XCTAssertEqual(sut.tail, expectedTail)
             for i in 0..<sut.count {
                 XCTAssertEqual(sut[i], elements[i])

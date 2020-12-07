@@ -32,14 +32,14 @@ extension CircularBuffer {
             growToNextSmartCapacityLevel()
         }
         elements.advanced(by: tail).initialize(to: newElement)
-        tail = incrementIndex(tail)
+        tail = incrementBufferIndex(tail)
         count += 1
     }
     
     /// Stores the given sequence of elements starting at the last position of the storage. Eventually grows the capacity of
     /// the storage if needed, adopting the smart capacity resizing policy.
     ///
-    /// - Parameter contentsOf: A sequence of elements to append.
+    /// - Parameter contentsOf: A sequence of elements to append. **Must be finite**.
     /// - Note: Calls iteratively `append(:_)` for each element of the given sequence.
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
@@ -49,7 +49,7 @@ extension CircularBuffer {
         guard
             let _ = newElements
                 .withContiguousStorageIfAvailable({ buff -> Bool in
-                    append(contentsOf: buff)
+                    append(contentsOf: buff, usingSmartCapacityPolicy: true)
                     
                     return true
                 })
@@ -61,7 +61,7 @@ extension CircularBuffer {
             
             let additionalElementsCount = newElements.underestimatedCount - residualCapacity
             if additionalElementsCount > 0 {
-                let newCapacity = Self.smartCapacityFor(count: capacity + additionalElementsCount)
+                let newCapacity = Self.smartCapacityFor(count: count + additionalElementsCount)
                 fastResizeElements(to: newCapacity)
             }
             append(firstNewElement)
@@ -83,11 +83,11 @@ extension CircularBuffer {
         
         if isFull {
             elements.advanced(by: tail).pointee = newElement
-            tail = incrementIndex(tail)
-            head = incrementIndex(head)
+            tail = incrementBufferIndex(tail)
+            head = incrementBufferIndex(head)
         } else {
             elements.advanced(by: tail).initialize(to: newElement)
-            tail = incrementIndex(tail)
+            tail = incrementBufferIndex(tail)
             count += 1
         }
     }
@@ -97,6 +97,7 @@ extension CircularBuffer {
     /// from first position.
     ///
     /// - Parameter contentsOf: The sequence of elements to store starting from the last position of the storage.
+    ///                         **Must be finite**.
     public func pushBack<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
         guard capacity > 0 else { return }
         
@@ -111,7 +112,7 @@ extension CircularBuffer {
                 guard
                     addedCount > self.residualCapacity
                 else {
-                    self.fastAppend(buff)
+                    self.fastInplaceAppend(buff)
                     
                     return true
                 }
@@ -152,13 +153,13 @@ extension CircularBuffer {
         if isFull {
             growToNextSmartCapacityLevel()
         }
-        head = decrementIndex(head)
+        head = decrementBufferIndex(head)
         elements.advanced(by: head).initialize(to: newElement)
         count += 1
     }
     
-    /// Stores the given sequence of elements at the first position of the storage. Eventually grows the capacity of
-    /// the storage if needed, adopting the smart capacity resizing policy.
+    /// Stores the given sequence of elements at the first position of the storage by iteratively pusshing them.
+    /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// Since the sequence is iterated and at each iteration an element is pushed, the elements will appear in
     /// reversed order inside the `CircularBuffer`:
@@ -168,7 +169,7 @@ extension CircularBuffer {
     /// buffer.push(contentsOf: sequence)
     /// // buffer's storage: [3, 2, 1]
     /// ```
-    /// - Parameter contentsOf: A sequence of elements to push.
+    /// - Parameter contentsOf: A sequence of elements to push. **Must be finite**.
     /// - Note: Calls iteratively `push(:_)` for each element of the given sequence.
     ///         Capacity is grown when necessary to hold all new elements.
     ///         A better appending performance is obtained when the given sequence's `underestimatedCount`
@@ -186,7 +187,7 @@ extension CircularBuffer {
             var elementsIterator = newElements.makeIterator()
             guard
                 let firstNewElement = elementsIterator.next()
-                else { return }
+            else { return }
             
             let additionalElementsCount = newElements.underestimatedCount - residualCapacity
             if additionalElementsCount > 0 {
@@ -203,34 +204,31 @@ extension CircularBuffer {
         
     }
     
-    /// Stores the given collection of elements at first position of the storage, mainteining their order.
+    /// Stores the given sequence of elements starting from first position of the storage, mainteining their order.
     /// Eventually grows the capacity of the storage if needed, adopting the smart capacity resizing policy.
     ///
     /// ```
-    /// let newElements = [1, 2, 3]
+    /// let newElements = AnySequence([1, 2, 3])
     /// let buffer = CircularBuffer<Int>()
     /// buffer.prepend(contentsOf: newElements)
     /// // buffer's storage: [1, 2, 3]
     /// ```
-    /// - Parameter contentsOf: A collection of `Element` instances to store at the top of the storage.
-    public func prepend<C: Collection>(contentsOf newElements: C) where C.Iterator.Element == Element {
-        guard newElements.count > 0 else { return }
-        
-        if count + newElements.count <= capacity
-        {
-            // actual buffer can hold all elements, thus prepend _newElements in place…
-            // Calculate the buffer index where newElements have to be appended:
-            let newHead = head - newElements.count < 0 ? capacity - (newElements.count - head) : head - newElements.count
-            // Copy newElements in place:
-            initializeElements(advancedToBufferIndex: newHead, from: newElements)
+    /// - Parameter contentsOf: A sequence of `Element` instances to store at the top of the storage.
+    ///                         **Must be finite**.
+    @inlinable
+    public func prepend<S: Sequence>(contentsOf newElements: S) where Element == S.Iterator.Element {
+        guard
+            let _ = newElements
+                .withContiguousStorageIfAvailable({ buff -> Bool in
+                    prepend(contentsOf: buff, usingSmartCapacityPolicy: true)
+                    
+                    return true
+                })
+        else {
+            let asArray = Array(newElements)
+            prepend(contentsOf: asArray, usingSmartCapacityPolicy: true)
             
-            // Update both _elementsCount and _head to new values:
-            count += newElements.count
-            head = newHead
-        } else {
-            // resize buffer to the right capacity prepending _newElements
-            let newCapacity = Self.smartCapacityFor(count: capacity + newElements.count)
-            fastResizeElements(to: newCapacity, insert: newElements, at: 0)
+            return
         }
     }
     
@@ -242,10 +240,10 @@ extension CircularBuffer {
     public func pushFront(_ newElement: Element) {
         guard capacity > 0 else { return }
         
-        head = decrementIndex(head)
+        head = decrementBufferIndex(head)
         if isFull {
             elements.advanced(by: head).pointee = newElement
-            tail = decrementIndex(tail)
+            tail = decrementBufferIndex(tail)
         } else {
             elements.advanced(by: head).initialize(to: newElement)
             count += 1
@@ -274,7 +272,8 @@ extension CircularBuffer {
                 guard
                     addedCount > self.residualCapacity
                 else {
-                    self.fastPrepend(buff.reversed())
+                    //self.fastPrepend(buff.reversed())
+                    self.fastInplacePrepend(buff.reversed())
                     
                     return true
                 }
@@ -329,57 +328,21 @@ extension CircularBuffer {
     ///                     the operation is the same as in `append(contentsOf:)`.
     /// - Parameter contentsOf: A collection of `Element` instances to insert in the buffer starting from given
     ///                         `index` parameter.
-    public func insertAt<C: Collection>(index: Int, contentsOf newElements: C) where C.Iterator.Element == Element {
-        precondition(index >= 0 && index <= count)
-        
-        // Check if it's a prepend operation:
-        guard
-            index != 0
-        else {
-            prepend(contentsOf: newElements)
-            
-            return
-        }
-        
-        // Otherwise could be an append operation:
-        guard
-            index != count
-        else {
-            append(contentsOf: newElements)
-            
-            return
-        }
-        
-        // Check if there's elements to insert:
+    @inlinable
+    public func insertAt<C: Collection>(index: Int, contentsOf newElements: C,  usingSmartCapacityPolicy: Bool = true) where C.Iterator.Element == Element {
+        precondition(index >= 0 && index <= count, "Index is out of bounds")
+        // Check if there are elements to insert:
         guard
             !newElements.isEmpty
         else { return }
         
-        if count + newElements.count <= capacity {
+        let newCount = count + newElements.count
+        if newCount <= capacity {
             // capacity is enough to hold addition, thus insert newElements in place
-            let buffIdx = bufferIndex(from: index)
-            
-            // Temporarly move out elements that has to be shifted:
-            let elementsToShiftCount = count - index
-            let swap = UnsafeMutablePointer<Element>.allocate(capacity: elementsToShiftCount)
-            moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: elementsToShiftCount, to: swap)
-            
-            // Copy newElements in place, obtaining the buffer index where the shifted
-            // elements have to be moved back in:
-            let buffIdxForFirstShifted = initializeElements(advancedToBufferIndex: buffIdx, from: newElements)
-            
-            // Move back into the buffer the elements which shift position, obtaining the
-            // next buffer index after them (which will be used to calculate the
-            // new _tail index):
-            let lastBuffIdx = moveInitializeToElements(advancedToBufferIndex: buffIdxForFirstShifted, from: swap, count: elementsToShiftCount)
-            
-            // Cleanup, update both _elementsCount and _tail to new values:
-            swap.deallocate()
-            count += newElements.count
-            tail = incrementIndex(lastBuffIdx - 1)
+            fastInplaceInsert(newElements, at: index)
         } else {
             // We have to resize
-            let newCapacity = Self.smartCapacityFor(count: count + newElements.count)
+            let newCapacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: newCount) : newCount
             fastResizeElements(to: newCapacity, insert: newElements, at: index)
         }
     }
