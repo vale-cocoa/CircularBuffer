@@ -48,18 +48,20 @@ public final class CircularBuffer<Element> {
     /// - Parameter capacity:   An `Int` value representing the number of elements this instance can hold
     ///                         without having to reallocate memory. **Must not be negative**.
     ///                         Defaults to `0`.
-    /// - Parameter matchingExactly:    A boolean value flagging wheter the `capacity`
-    ///                                 value of the returned instance should be exactly equal to the
-    ///                                 specified one, or if the dimensioning can use a smarter approach,
-    ///                                 hence by eventually allocate a bigger `capacity` value.
-    ///                                 Defaults to `false`
-    /// - Note: The `matchingExactly` flag plays an important role in regards to how the buffer sizing will result
-    ///         in the returned instance. For example when specifying a `capacity` value of `0`
-    ///         in conjuction with a `matchingExactly` value of `true`, the returned instance will have
-    ///         a `capacity` value greater than `0` according to the minimum value allowed by the internal policy.
-    public init(capacity: Int = 0, matchingExactly: Bool = false) {
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When `true` is specified, then the
+    ///                                         `capacity` value of the returned instance is calculated
+    ///                                         by using the smart capacity policy.
+    ///                                         When `false` is specified, the `capacity` value of the
+    ///                                         returned instance will match exactly the value specified in the
+    ///                                         call.
+    ///                                         **Defaults to true**.
+    /// - Note: The `usingSmartCapacityPolicy` flag plays an important role in regards to how the buffer
+    ///         sizing will result in the returned instance. For example when specifying a `capacity` value of `0`
+    ///         in conjuction with a `usingSmartCapacityPolicy` value of `true`, the returned instance will have
+    ///         a `capacity` value greater than `0`.
+    public init(capacity: Int = 0, usingSmartCapacityPolicy: Bool = true) {
         precondition(capacity >= 0, "Negative capacity values are not allowed.")
-        let newCapacity = matchingExactly ? capacity : Self.smartCapacityFor(count: capacity)
+        let newCapacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: capacity) : capacity
         self.elements = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         self.capacity = newCapacity
         self.count = 0
@@ -73,24 +75,25 @@ public final class CircularBuffer<Element> {
     /// - Parameter repeating: The element to store repeatedly.
     /// - Parameter count:  The number of times to repeat the given element in the storage. Must be greater than
     ///                     or equal to zero
-    /// - Parameter capacityMatchesExactlyCount:    A boolean value flagging wheter the `capacity`
-    ///                                             value of the returned instance should be exactly equal
-    ///                                             to the final `count` of stored elements, or if the
-    ///                                             dimensioning can use a smarter approach, hence by
-    ///                                             eventually allocate a bigger `capacity` value.
-    ///                                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When `true` is specified, then the
+    ///                                         `capacity` value of the returned instance is calculated
+    ///                                         by using the smart capacity policy.
+    ///                                         When `false` is specified, the `capacity` value of the
+    ///                                         returned instance will match exactly the value specified
+    ///                                         as `count` parameter.
+    ///                                         **Defaults to true**.
     /// - Returns:  A new `CircularBuffer` instance initialized and containing the same element
     ///             specified as `repeated` parameter for the specified number of times
     ///             specified as `count` parameter value.
     /// - Note: If `count` is zero, returns an empty instance.
-    ///         The `capacityMatchesExactlyCount` flag plays an important role in regards to how the buffer
+    ///         The `usingSmartCapacityPolicy` flag plays an important role in regards to how the buffer
     ///         sizing will result in the returned instance.
     ///         For example when specifying a `count` value of `0` in conjuction with a
-    ///         `capacityMatchesExactlyCount` value of `true`, the returned instance will have
-    ///         a `capacity` value greater than `0` according to the minimum value allowed by the internal policy.
-    public init(repeating repeated: Element, count: Int, capacityMatchesExactlyCount: Bool = false) {
+    ///         `usingSmartCapacityPolicy` value of `true`, the returned instance will have
+    ///         a `capacity` value greater than `0`.
+    public init(repeating repeated: Element, count: Int, usingSmartCapacityPolicy: Bool = true) {
         precondition(count >= 0)
-        let nCapacity = capacityMatchesExactlyCount ? count : Self.smartCapacityFor(count: count)
+        let nCapacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: count) : count
         self.elements = UnsafeMutablePointer<Element>.allocate(capacity: nCapacity)
         
         if count > 0 {
@@ -106,28 +109,29 @@ public final class CircularBuffer<Element> {
     /// specified as `elements` parameter, stored in the same order of the sequence enumeration.
     ///
     /// - Parameter elements: A sequence of elements to store. **Must be finite**.
-    /// - Parameter capacityMatchesExactlyCount:    A boolean value flagging wheter the `capacity`
-    ///                                             value of the returned instance should be exactly equal
-    ///                                             to the final `count` of stored elements, or if the
-    ///                                             dimensioning can use a smarter approach, hence by
-    ///                                             eventually allocate a bigger `capacity` value.
-    ///                                             Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When `true` is specified, then the
+    ///                                         `capacity` value of the returned instance is calculated
+    ///                                         by using the smart capacity policy.
+    ///                                         When `false` is specified, the `capacity` value of the
+    ///                                         returned instance will match exactly the lenght of the specified
+    ///                                         sequence.
+    ///                                         **Defaults to true**.
     /// - Returns: A new `CircularBuffer` instance initialized and containing the same elements of the sequence
     ///            specified as `elements` parameter, stored in the same order of the sequence enumeration.
     /// - Note: When `elements`is an empty sequence, it returns an empty instance.
-    ///         The `capacityMatchesExactlyCount` flag plays an important role in regards to how the buffer
+    ///         The `usingSmartCapacityPolicy` flag plays an important role in regards to how the buffer
     ///         sizing will result in the returned instance.
-    ///         For example when specifying a `capacityMatchesExactlyCount` value of `true`,
+    ///         For example when specifying a `usingSmartCapacityPolicy` value of `true`,
     ///         the returned instance might have a `capacity` value greater than
-    ///         the final `count` of stored elements.
-    public convenience init<S: Sequence>(elements: S, capacityMatchesExactlyCount: Bool = false) where Element == S.Iterator.Element {
+    ///         the lenght of the specified sequence.
+    public convenience init<S: Sequence>(elements: S, usingSmartCapacityPolicy: Bool = true) where Element == S.Iterator.Element {
         var capacity: Int!
         var buffer: UnsafeMutablePointer<Element>!
         var count: Int!
         
         let done: Bool = elements
             .withContiguousStorageIfAvailable({ buff -> Bool in
-                capacity = capacityMatchesExactlyCount ? buff.count : Self.smartCapacityFor(count: buff.count)
+                capacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: buff.count) : buff.count
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                 count = buff.count
                 if count > 0 {
@@ -143,13 +147,13 @@ public final class CircularBuffer<Element> {
             if
                 let firstElement = sequenceIterator.next()
             {
-                capacity = capacityMatchesExactlyCount ? sequenceCount : Self.smartCapacityFor(count: sequenceCount)
+                capacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: sequenceCount) : sequenceCount
                 count = 1
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                 buffer.initialize(to: firstElement)
                 while let nextElement = sequenceIterator.next() {
                     if count + 1 >= capacity {
-                        capacity = capacityMatchesExactlyCount ? count + 1 : Self.smartCapacityFor(count: count + 1)
+                        capacity = usingSmartCapacityPolicy ? Self.smartCapacityFor(count: count + 1) : count + 1
                         let swap = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
                         swap.moveInitialize(from: buffer, count: count)
                         buffer.deallocate()
@@ -159,7 +163,7 @@ public final class CircularBuffer<Element> {
                     count += 1
                 }
             } else {
-                capacity = capacityMatchesExactlyCount ? 0 : Self.minSmartCapacity
+                capacity = usingSmartCapacityPolicy ? Self.minSmartCapacity : 0
                 count = 0
                 buffer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
             }
@@ -275,25 +279,24 @@ public final class CircularBuffer<Element> {
     ///
     /// - Parameter additionalCapacity: Additional capacity to add to the copy. **Must not be negative**.
     ///                                 Defaults to zero.
-    /// - Parameter matchingExactlyCapacity:    A boolean value flagging wheter the `capacity`
-    ///                                         value of the returned instance should be exactly equal
-    ///                                         to the value resulting from increasing callee's
-    ///                                         `capacity` by what specified as
-    ///                                         `additionalCapacity` parameter, or if the
-    ///                                         dimensioning can use a smarter approach, hence by
-    ///                                         eventually allocate a bigger `capacity` value for the
-    ///                                         returned instance.
-    ///                                         Defaults to `false`.
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When `true` is specified, then the
+    ///                                         `capacity` value of the returned copy is calculated
+    ///                                         by using the smart capacity policy.
+    ///                                         When `false` is specified, the `capacity` value of the
+    ///                                         returned copy will match exactly
+    ///                                         the value of callee's `capacity` plus the value specified
+    ///                                         as `additionalCapacity` parameter.
+    ///                                         **Defaults to true**
     /// - Returns:  A copy of the `CircularBuffer` instance, eventually with increased capacity,
-    ///             containing a copy of the elements stored in the calee stored in the same order.
-    /// - Note: The `matchingExactlyCapacity` flag plays an important role in regards to how the buffer
+    ///             containing a copy of the elements stored in the calee in the same order.
+    /// - Note: The `usingSmartCapacityPolicy` flag plays an important role in regards to how the buffer
     ///         sizing will result in the returned instance.
-    ///         For example when specifying `true` as `matchingExactlyCapacity` value ,
+    ///         For example when specifying `true` as `usingSmartCapacityPolicy` value ,
     ///         the returned instance might have a `capacity` value greater than the value obtained by the sum of
     ///         the callee's `capacity` value and the value specified as `additionalCapacity` parameter.
-    public func copy(additionalCapacity: Int = 0, matchingExactlyCapacity: Bool = false) -> CircularBuffer {
-        let newCapacity = additionalCapacity > 0 ? (matchingExactlyCapacity ? capacity + additionalCapacity : Self.smartCapacityFor(count: capacity + additionalCapacity)) : capacity
-        let copy = CircularBuffer(capacity: newCapacity, matchingExactly: matchingExactlyCapacity)
+    public func copy(additionalCapacity: Int = 0, usingSmartCapacityPolicy: Bool = true) -> CircularBuffer {
+        let newCapacity = additionalCapacity > 0 ? (usingSmartCapacityPolicy ? Self.smartCapacityFor(count: capacity + additionalCapacity) : additionalCapacity + capacity) : capacity
+        let copy = CircularBuffer(capacity: newCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         if !isEmpty {
             initializeFromElements(advancedToBufferIndex: head, count: count, to: copy.elements)
         }
@@ -305,36 +308,35 @@ public final class CircularBuffer<Element> {
         return copy
     }
     
-    // MARK: - reserveCapacity(_:matchingExactlyCapacity:)
+    // MARK: - reserveCapacity(_:usingSmartCapacityPolicy:)
     /// Reserve enough memory in the underlaying buffer so that it has enough free spots for new elements
     /// at least equal to the value specified as `minimumCapacity`.
     ///
     /// - Parameter _:  An `Int` value representing the minimum number of free slots
     ///                 the buffer should have for storing new elements without reallocating memory.
     ///                 **Must not be negative**.
-    /// - Parameter matchingExactlyCapacity:    A boolean value flagging wheter the `capacity`
-    ///                                         value of the returned instance should be exactly equal
-    ///                                         to the value resulting from increasing callee's
-    ///                                         `capacity` or if the dimensioning can use
-    ///                                         a smarter approach, hence by eventually allocate a bigger
-    ///                                         `capacity` value after the operation.
-    ///                                         Defaults to `false`.
-    /// - Note: The `matchingExactlyCapacity` flag plays an important role in regards to how the buffer
+    /// - Parameter usingSmartCapacityPolicy:   A Boolean value. When `true` is specified, then the
+    ///                                         `capacity` value of the instance is calculated
+    ///                                         by using the smart capacity policy.
+    ///                                         When `false` is specified, the `capacity` value of the
+    ///                                         instance will match exactly its `count` value plus the
+    ///                                         value specified as `minimumCapacity`.
+    ///                                         **Defaults to true**
+    /// - Note: The `usingSmartCapacityPolicy` flag plays an important role in regards to how the buffer
     ///         sizing will be done.
-    ///         For example when specifying `true` as `matchingExactlyCapacity` value ,
+    ///         For example when specifying `true` as `usingSmartCapacityPolicy` value ,
     ///         the `capacity` value might be greater than the value obtained by the sum of
     ///         the callee's `count` value and the value specified as `minimumCapacity` parameter.
     ///         If callee's `residualCapacity` is greater than or equal to the value specified as
     ///         `minimumCapacity` parameter, no resizing will occur.
-    public func reserveCapacity(_ minimumCapacity: Int, matchingExactlyCapacity: Bool = false) {
+    public func reserveCapacity(_ minimumCapacity: Int, usingSmartCapacityPolicy: Bool = true) {
         precondition(minimumCapacity >= 0)
         guard
             minimumCapacity > 0,
             residualCapacity < minimumCapacity
         else { return }
         
-        let newCapacity = matchingExactlyCapacity ? count + minimumCapacity : Self.smartCapacityFor(count: count + minimumCapacity)
+        let newCapacity = capacityFor(newCount: count + minimumCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         fastResizeElements(to: newCapacity)
     }
-    
 }
