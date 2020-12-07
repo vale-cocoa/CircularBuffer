@@ -107,7 +107,7 @@ extension CircularBuffer {
         let newElementsCount = newElements.count
         guard newElementsCount > 0 else { return }
         
-        let newHead = head == 0 ? capacity - newElementsCount : (head - newElementsCount < 0 ? (capacity - (newElementsCount - head)) : head - newElementsCount)
+        let newHead = bufferIndex(from: head, offsetBy: -newElementsCount)
         initializeElements(advancedToBufferIndex: newHead, from: newElements)
         count += newElementsCount
         head = newHead
