@@ -19,6 +19,8 @@
 //
 
 extension CircularBuffer {
+    // The minimum number of elements the smart capacity policy establish to allocate
+    // memory for.
     @usableFromInline
     internal static var minSmartCapacity: Int { 4 }
     
@@ -34,6 +36,8 @@ extension CircularBuffer {
         return 1 << (Int.bitWidth - (count - 1).leadingZeroBitCount)
     }
     
+    // Resize the buffer with a larger capacity than actual one; the new size of the
+    // buffer will be the next one according to the smart capacity policy.
     @usableFromInline
     internal func growToNextSmartCapacityLevel() {
         precondition(capacity < Int.max, "Can't grow capacity more than Int.max value: \(Int.max)")
@@ -41,6 +45,10 @@ extension CircularBuffer {
         fastResizeElements(to: newCapacity)
     }
     
+    // Returns an adeguate capacity value to store the specified new count of elements,
+    // taking into account whether we want to use the smart capacity policy in doing the
+    // calcultion or not, if we want to keep capacity or not in case we are specifying a
+    // newCount value which is less than the actual count.
     @usableFromInline
     internal func capacityFor(newCount: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> Int {
         assert(newCount >= 0)
@@ -73,6 +81,9 @@ extension CircularBuffer {
         return candidateCapacity
     }
     
+    // Eventually resize the buffer to a smaller capacity suitable for current count of
+    // elements and according whether to use the smart capacity policy or not in doing so,
+    // as per specified value of usingSmartCapacityPolicy parameter.
     @usableFromInline
     internal func reduceCapacityForCurrentCount(usingSmartCapacityPolicy: Bool = true) {
         guard !isEmpty else {
@@ -95,6 +106,9 @@ extension CircularBuffer {
         fastResizeElements(to: candidateCapacity)
     }
     
+    // Shift the elements in the buffer so they won't wrap around the last buffer position,
+    // but instead are all stored in a contiguous range of indexes; that is, after the
+    // operation took effect: head + count <= capacity
     @usableFromInline
     internal func makeElementsContiguous() {
         assert(!isEmpty, "No elements to wrap around")
@@ -122,6 +136,8 @@ extension CircularBuffer {
         tail = bufferIndex(from: head, offsetBy: count)
     }
     
+    // Resizes buffer to specified capacity value, which is assumed to be enough to
+    // store current count of elements.
     @usableFromInline
     internal func fastResizeElements(to newCapacity: Int) {
         assert(newCapacity >= count)
@@ -135,6 +151,10 @@ extension CircularBuffer {
         tail = incrementBufferIndex(count - 1)
     }
     
+    // Resizes buffer to specified capacity value, which is assumed to be enough to
+    // store current count of elements plus the count of the given collection of elements
+    // that will be inserted at specified position (which also is assumed to be in range
+    // of 0...count)
     @usableFromInline
     internal func fastResizeElements<C: Collection>(to newCapacity: Int, insert newElements: C, at index: Int) where C.Iterator.Element == Element {
         assert(newCapacity >= count + newElements.count)
@@ -183,6 +203,9 @@ extension CircularBuffer {
         tail = incrementBufferIndex(count - 1)
     }
     
+    // Resizes buffer to specified capacity value, which is assumed to be enough to
+    // store the count of elements deriving from replacing the elements at the
+    // specified positions range with the one stored in the specified collection.
     @usableFromInline
     func fastResizeElements<C: Collection>(to newCapacity: Int, replacing subrange: Range<Int>, with newElements: C) where Element == C.Iterator.Element {
         assert(newCapacity >= 0)
@@ -226,6 +249,13 @@ extension CircularBuffer {
         tail = incrementBufferIndex(count - 1)
     }
     
+    // Resizes buffer to specified capacity value, which is assumed to be enough to
+    // store the count of elements deriving from removing elements from the specified
+    // position in number of specified k parameter.
+    // Assuming also that the index is in 0..<count range, and the count k of elements to
+    // remove is not larger than those stored in the buffer after and including the one at
+    // the specified position.
+    // Removed elements will also be returned in an array.
     @usableFromInline
     @discardableResult
     internal func fastResizeElements(to newCapacity: Int, removingAt index: Int, count k: Int) -> [Element] {
