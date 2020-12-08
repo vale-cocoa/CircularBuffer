@@ -121,14 +121,14 @@ extension CircularBuffer {
                 
                 if addedCount > self.capacity {
                     let slice = buff[(buff.endIndex - self.capacity)..<buff.endIndex]
-                    self.deinitializeElements(advancedToBufferIndex: self.head, count: self.count)
-                    self.initializeElements(advancedToBufferIndex: 0, from: slice)
+                    self.unsafeDeinitializeElements(advancedToBufferIndex: self.head, count: self.count)
+                    self.unsafeInitializeElements(advancedToBufferIndex: 0, from: slice)
                     self.head = 0
                     self.tail = 0
                 } else {
                     let countToDeinitialize = addedCount - self.residualCapacity >= self.count ? self.count : addedCount - self.residualCapacity
-                    let newHead = self.deinitializeElements(advancedToBufferIndex: self.head, count: countToDeinitialize)
-                    self.initializeElements(advancedToBufferIndex: self.tail, from: buff)
+                    let newHead = self.unsafeDeinitializeElements(advancedToBufferIndex: self.head, count: countToDeinitialize)
+                    self.unsafeInitializeElements(advancedToBufferIndex: self.tail, from: buff)
                     self.head = newHead
                     self.tail = self.head
                 }
@@ -285,16 +285,16 @@ extension CircularBuffer {
                 if addedCount > self.capacity {
                     let slice = buff[buff.endIndex - self.capacity..<buff.endIndex]
                         .reversed()
-                    self.deinitializeElements(advancedToBufferIndex: self.head, count: self.count)
-                    self.initializeElements(advancedToBufferIndex: 0, from: slice)
+                    self.unsafeDeinitializeElements(advancedToBufferIndex: self.head, count: self.count)
+                    self.unsafeInitializeElements(advancedToBufferIndex: 0, from: slice)
                     self.head = 0
                     self.tail = 0
                 } else {
                     let countToDeinitialize = addedCount - self.residualCapacity >= self.count ? self.count : addedCount - self.residualCapacity
                     let newTail = self.bufferIndex(from: self.count - countToDeinitialize)
-                    self.deinitializeElements(advancedToBufferIndex: newTail, count: countToDeinitialize)
+                    self.unsafeDeinitializeElements(advancedToBufferIndex: newTail, count: countToDeinitialize)
                     self.tail = newTail
-                    self.initializeElements(advancedToBufferIndex: newTail, from: buff.reversed())
+                    self.unsafeInitializeElements(advancedToBufferIndex: newTail, from: buff.reversed())
                     self.head = newTail
                 }
                 self.count = self.capacity

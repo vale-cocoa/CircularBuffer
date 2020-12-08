@@ -457,7 +457,7 @@ final class AddElementsOperationsTests: XCTestCase {
         // let's also do this test when sut storage wraps around
         for headShift in 1..<19 {
             sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
             sut.head = headShift
             sut.count = 10
             sut.tail = tail
@@ -512,7 +512,7 @@ final class AddElementsOperationsTests: XCTestCase {
             for countOfTrumped in 1...10 {
                 XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
                 sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
                 sut.head = headShift
                 sut.count = 10
                 sut.tail = tail
@@ -595,7 +595,7 @@ final class AddElementsOperationsTests: XCTestCase {
         // let's also do this test when sut storage wraps around
         for headShift in 1..<19 {
             sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
             sut.head = headShift
             sut.count = 10
             sut.tail = tail
@@ -650,7 +650,7 @@ final class AddElementsOperationsTests: XCTestCase {
             for countOfTrumped in 1...10 {
                 XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
                 sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
                 sut.head = headShift
                 sut.count = 10
                 sut.tail = tail
@@ -1345,7 +1345,7 @@ final class AddElementsOperationsTests: XCTestCase {
         // let's also do this test when sut storage wraps around
         for headShift in 1..<19 {
             sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
             sut.head = headShift
             sut.count = 10
             sut.tail = tail
@@ -1401,7 +1401,7 @@ final class AddElementsOperationsTests: XCTestCase {
             for countOfTrumped in 1...10 {
                 XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
                 sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
                 sut.head = headShift
                 sut.count = 10
                 sut.tail = tail
@@ -1484,7 +1484,7 @@ final class AddElementsOperationsTests: XCTestCase {
         // let's also do this test when sut storage wraps around
         for headShift in 1..<19 {
             sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-            let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+            let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
             sut.head = headShift
             sut.count = 10
             sut.tail = tail
@@ -1540,7 +1540,7 @@ final class AddElementsOperationsTests: XCTestCase {
             for countOfTrumped in 1...10 {
                 XCTAssertGreaterThan(newElementsStorage.count, sut.residualCapacity)
                 sut = CircularBuffer(capacity: 20, usingSmartCapacityPolicy: false)
-                let tail = sut.initializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
+                let tail = sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: (1...10).map { $0 * 10 } )
                 sut.head = headShift
                 sut.count = 10
                 sut.tail = tail

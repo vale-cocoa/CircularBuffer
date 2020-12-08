@@ -145,7 +145,7 @@ extension CircularBuffer {
         
         if newCapacity == capacity {
             
-            return fastInPlaceRemoveFirstElements(k)
+            return fastInplaceRemoveFirstElements(k)
         } else {
             
             return fastResizeElements(to: newCapacity, removingAt: 0, count: k)
@@ -202,7 +202,7 @@ extension CircularBuffer {
         
         if newCapacity == capacity {
             
-            return fastInPlaceRemoveLastElements(k)
+            return fastInplaceRemoveLastElements(k)
         } else {
             
             return fastResizeElements(to: newCapacity, removingAt: count - k, count: k)
@@ -267,7 +267,7 @@ extension CircularBuffer {
         
         if newCapacity == capacity {
             
-            return fastInPlaceRemoveElements(at: index, count: k)
+            return fastInplaceRemoveElements(at: index, count: k)
         } else {
             
             return fastResizeElements(to: newCapacity, removingAt: index, count: k)
@@ -312,7 +312,7 @@ extension CircularBuffer {
         guard count > 0 else { return [] }
         
         let removed = UnsafeMutablePointer<Element>.allocate(capacity: count)
-        moveInitializeFromElements(advancedToBufferIndex: head, count: count, to: removed)
+        unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: count, to: removed)
         let result = Array(UnsafeBufferPointer(start: removed, count: count))
         removed.deinitialize(count: count)
         removed.deallocate()

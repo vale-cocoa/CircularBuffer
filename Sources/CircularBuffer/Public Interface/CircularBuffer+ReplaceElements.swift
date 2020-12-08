@@ -83,7 +83,7 @@ extension CircularBuffer {
                 let newCapacity = capacityFor(newCount: newCount, keepCapacity: keepCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
                 if newCapacity == capacity {
                     // we must do the replace in place without resizing the buffer
-                    fastInPlaceReplaceElements(subrange: subrange, with: newElements)
+                    fastInplaceReplaceElements(subrange: subrange, with: newElements)
                 } else {
                     // we must resize the buffer
                     fastResizeElements(to: newCapacity, replacing: subrange, with: newElements)

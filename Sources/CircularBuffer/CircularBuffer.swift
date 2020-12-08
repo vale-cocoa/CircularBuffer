@@ -203,7 +203,7 @@ public final class CircularBuffer<Element> {
     }
     
     deinit {
-        deinitializeElements(advancedToBufferIndex: head, count: count)
+        unsafeDeinitializeElements(advancedToBufferIndex: head, count: count)
         elements.deallocate()
     }
     
@@ -298,7 +298,7 @@ public final class CircularBuffer<Element> {
         let newCapacity = additionalCapacity > 0 ? (usingSmartCapacityPolicy ? Self.smartCapacityFor(count: capacity + additionalCapacity) : additionalCapacity + capacity) : capacity
         let copy = CircularBuffer(capacity: newCapacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
         if !isEmpty {
-            initializeFromElements(advancedToBufferIndex: head, count: count, to: copy.elements)
+            unsafeInitializeFromElements(advancedToBufferIndex: head, count: count, to: copy.elements)
         }
         
         copy.count = count

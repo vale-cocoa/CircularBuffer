@@ -25,7 +25,7 @@ extension CircularBuffer {
         precondition(headShift > 0, "Head shift must be greater than 0")
         let minSmartCapacity = headShift >= containedElements.count ? smartCapacityFor(count: containedElements.count + 1) : smartCapacityFor(count: containedElements.count)
         let result = CircularBuffer(capacity: minSmartCapacity)
-        result.tail = result.initializeElements(advancedToBufferIndex: headShift, from: containedElements)
+        result.tail = result.unsafeInitializeElements(advancedToBufferIndex: headShift, from: containedElements)
         result.head = headShift
         result.count = containedElements.count
         

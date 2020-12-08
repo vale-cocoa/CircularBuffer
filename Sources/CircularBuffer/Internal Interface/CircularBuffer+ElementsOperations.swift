@@ -43,6 +43,7 @@ extension CircularBuffer {
     
     @usableFromInline
     internal func capacityFor(newCount: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> Int {
+        assert(newCount >= 0)
         guard capacity > newCount else {
             if usingSmartCapacityPolicy {
                 
@@ -95,21 +96,38 @@ extension CircularBuffer {
     }
     
     @usableFromInline
-    internal func fastRotateElementsHeadToZero() {
-        let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
-        
-        moveInitializeFromElements(advancedToBufferIndex: head, count: count, to: newBuff)
-        elements.deallocate()
-        elements = newBuff
-        head = 0
-        tail = incrementBufferIndex(count - 1)
+    internal func makeElementsContiguous() {
+        assert(!isEmpty, "No elements to wrap around")
+        assert(head + count > capacity, "Elements aren't wrapping around")
+        let wrappingElementsCount = count - (capacity - head)
+        let headElementsCount = capacity - head
+        var newHead: Int!
+        if residualCapacity < wrappingElementsCount {
+            newHead = bufferIndex(from: head, offsetBy: -wrappingElementsCount)
+            let swap = UnsafeMutablePointer<Element>.allocate(capacity: wrappingElementsCount)
+            swap.moveInitialize(from: elements, count: wrappingElementsCount)
+            elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
+            elements.advanced(by: newHead + headElementsCount).moveInitialize(from: swap, count: wrappingElementsCount)
+            swap.deallocate()
+        } else if wrappingElementsCount <= headElementsCount {
+            newHead = bufferIndex(from: head, offsetBy: -wrappingElementsCount)
+            elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
+            elements.advanced(by: newHead + headElementsCount).moveInitialize(from: elements, count: wrappingElementsCount)
+        } else {
+            newHead = tail - headElementsCount
+            elements.advanced(by: tail).moveInitialize(from: elements, count: wrappingElementsCount)
+            elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
+        }
+        head = newHead
+        tail = bufferIndex(from: head, offsetBy: count)
     }
     
     @usableFromInline
     internal func fastResizeElements(to newCapacity: Int) {
+        assert(newCapacity >= count)
         let newBuff = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         
-        moveInitializeFromElements(advancedToBufferIndex: head, count: count, to: newBuff)
+        unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: count, to: newBuff)
         elements.deallocate()
         elements = newBuff
         capacity = newCapacity
@@ -119,10 +137,11 @@ extension CircularBuffer {
     
     @usableFromInline
     internal func fastResizeElements<C: Collection>(to newCapacity: Int, insert newElements: C, at index: Int) where C.Iterator.Element == Element {
+        assert(newCapacity >= count + newElements.count)
         let newBuffer = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         
         // copy newElements inside newBuffer
-        newBuffer.advanced(by: index).initialize(from: newElements)
+        newBuffer.advanced(by: index).unsafeInitialize(from: newElements)
         
         // Find out how and where to move elements into newBuffer
         let buffIdx = index == count ? head + count : bufferIndex(from: index)
@@ -142,18 +161,18 @@ extension CircularBuffer {
         // move elements into newBuffer
         if leftSplitStart == rightSplitStart {
             // elements are either appended or prepended to newBuffer
-            moveInitializeFromElements(advancedToBufferIndex: head, count: count, to: newBuffer.advanced(by: leftSplitStart))
+            unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: count, to: newBuffer.advanced(by: leftSplitStart))
         } else {
             // elements will occupy two splits inside the newBuffer
             let countOfFirstSplit = index
             let countOfSecondSplit = count - index
             // move first split:
             if countOfFirstSplit > 0 {
-                moveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuffer)
+                unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuffer)
             }
             // move second split:
             if countOfSecondSplit > 0 {
-                moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: countOfSecondSplit, to: newBuffer.advanced(by: rightSplitStart))
+                unsafeMoveInitializeFromElements(advancedToBufferIndex: buffIdx, count: countOfSecondSplit, to: newBuffer.advanced(by: rightSplitStart))
             }
         }
         elements.deallocate()
@@ -166,32 +185,35 @@ extension CircularBuffer {
     
     @usableFromInline
     func fastResizeElements<C: Collection>(to newCapacity: Int, replacing subrange: Range<Int>, with newElements: C) where Element == C.Iterator.Element {
+        assert(newCapacity >= 0)
+        assert(subrange.lowerBound >= 0 && subrange.upperBound <= count)
         let buffIdx = bufferIndex(from: subrange.lowerBound)
         let newBuffer = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         let newElementsCount = newElements.count
+        assert(newCapacity >= newElementsCount)
         
         let countOfFirstSplit = subrange.lowerBound
         let countOfSecondSplit = count - countOfFirstSplit - subrange.count
         
         // Deinitialize in elements the replaced subrange and obtain the
         // buffer index to second split of elements to move from elements:
-        let secondSplitStartBuffIdx = deinitializeElements(advancedToBufferIndex: buffIdx, count: subrange.count)
+        let secondSplitStartBuffIdx = unsafeDeinitializeElements(advancedToBufferIndex: buffIdx, count: subrange.count)
         
         // Now move everything in newBuff…
         // Eventually the first split from elements:
         var newBuffIdx = 0
         if countOfFirstSplit > 0 {
-            moveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuffer)
+            unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: countOfFirstSplit, to: newBuffer)
             newBuffIdx += countOfFirstSplit
         }
         
         // Then newElements:
-        newBuffer.advanced(by: newBuffIdx).initialize(from: newElements)
+        newBuffer.advanced(by: newBuffIdx).unsafeInitialize(from: newElements)
         newBuffIdx += newElementsCount
         
         // Eventually the second split from _elements:
         if countOfSecondSplit > 0 {
-            moveInitializeFromElements(advancedToBufferIndex: secondSplitStartBuffIdx, count: countOfSecondSplit, to: newBuffer.advanced(by: newBuffIdx))
+            unsafeMoveInitializeFromElements(advancedToBufferIndex: secondSplitStartBuffIdx, count: countOfSecondSplit, to: newBuffer.advanced(by: newBuffIdx))
         }
         
         // deallocate and update elements with newBuff:
@@ -207,17 +229,20 @@ extension CircularBuffer {
     @usableFromInline
     @discardableResult
     internal func fastResizeElements(to newCapacity: Int, removingAt index: Int, count k: Int) -> [Element] {
+        assert(k >= 0 && k <= count - index)
+        assert(newCapacity >= count - k)
+        assert(index >= 0 && index < count)
         let result = UnsafeMutablePointer<Element>.allocate(capacity: k)
         let buffIdx = bufferIndex(from: index)
-        moveInitializeFromElements(advancedToBufferIndex: buffIdx, count: k, to: result)
+        unsafeMoveInitializeFromElements(advancedToBufferIndex: buffIdx, count: k, to: result)
         defer {
             result.deinitialize(count: k)
             result.deallocate()
             let newCount = count - k
             let newElements = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
-            moveInitializeFromElements(advancedToBufferIndex: head, count: index, to: newElements)
+            unsafeMoveInitializeFromElements(advancedToBufferIndex: head, count: index, to: newElements)
             let buffIdxOfLastChunk = bufferIndex(from: index + k)
-            moveInitializeFromElements(advancedToBufferIndex: buffIdxOfLastChunk, count: count - (index + k), to: newElements.advanced(by: index))
+            unsafeMoveInitializeFromElements(advancedToBufferIndex: buffIdxOfLastChunk, count: count - (index + k), to: newElements.advanced(by: index))
             elements.deallocate()
             elements = newElements
             capacity = newCapacity
@@ -231,11 +256,21 @@ extension CircularBuffer {
     
 }
 
-// MARK: - elements pointer operations
+// MARK: - elements pointer unsafe operations
+// All these methods are manipulating directly the memory buffers of their parameters.
+// It is assumed that preconditions as boundaries checking, allocations count,
+// and correct state of affected memory portions were met before call.
 extension CircularBuffer {
+    // Initializes destination memory pointer from elements buffer,
+    // starting from the element stored at given index in the buffer and
+    // for the given count of elements. It then returns the next valid buffer index after
+    // the last element picked up from the buffer.
+    //
+    // This operation takes into account the fact that the elements might be stored
+    // in the buffer wrapping around the buffer's last position.
     @usableFromInline
     @discardableResult
-    internal func initializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    internal func unsafeInitializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > capacity {
             let segmentCount = capacity - startIdx
@@ -252,17 +287,17 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func initializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
+    internal func unsafeInitializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
         let nextBufferIdx: Int
         if startIdx + newElements.count > capacity {
             let segmentCount = capacity - startIdx
             let firstSplitRange = newElements.startIndex..<newElements.index(newElements.startIndex, offsetBy: segmentCount)
             let secondSplitRange = newElements.index(newElements.startIndex, offsetBy: segmentCount)..<newElements.endIndex
-            elements.advanced(by: startIdx).initialize(from: newElements[firstSplitRange])
-            elements.initialize(from: newElements[secondSplitRange])
+            elements.advanced(by: startIdx).unsafeInitialize(from: newElements[firstSplitRange])
+            elements.unsafeInitialize(from: newElements[secondSplitRange])
             nextBufferIdx = newElements.count - segmentCount
         } else {
-            elements.advanced(by: startIdx).initialize(from: newElements)
+            elements.advanced(by: startIdx).unsafeInitialize(from: newElements)
             nextBufferIdx = startIdx + newElements.count
         }
         
@@ -271,7 +306,7 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func moveInitializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    internal func unsafeMoveInitializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > capacity {
             let segmentCount = capacity - startIdx
@@ -288,7 +323,7 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func moveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
+    internal func unsafeMoveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
         let nextBuffIdx: Int!
         if startIdx + k > capacity {
             let segmentCount = capacity - startIdx
@@ -305,17 +340,17 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func assignElements<C: Collection>(advancedToBufferIndex startIdx: Int, from newElements: C) -> Int where Element == C.Iterator.Element {
+    internal func unsafeAssignElements<C: Collection>(advancedToBufferIndex startIdx: Int, from newElements: C) -> Int where Element == C.Iterator.Element {
         let nextBufferIdx: Int
         if startIdx + newElements.count > capacity {
             let segmentCount = capacity - startIdx
             let firstSplitRange = newElements.startIndex..<newElements.index(newElements.startIndex, offsetBy: segmentCount)
             let secondSplitRange = newElements.index(newElements.startIndex, offsetBy: segmentCount)..<newElements.endIndex
-            elements.advanced(by: startIdx).assign(from: newElements[firstSplitRange])
-            elements.assign(from: newElements[secondSplitRange])
+            elements.advanced(by: startIdx).unsafeAssign(from: newElements[firstSplitRange])
+            elements.unsafeAssign(from: newElements[secondSplitRange])
             nextBufferIdx = newElements.count - segmentCount
         } else {
-            elements.advanced(by: startIdx).assign(from: newElements)
+            elements.advanced(by: startIdx).unsafeAssign(from: newElements)
             nextBufferIdx = startIdx + newElements.count
         }
         
@@ -324,7 +359,7 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func moveAssignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    internal func unsafeMoveAssignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > capacity {
             let segmentCount = capacity - startIdx
@@ -341,7 +376,7 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func assignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
+    internal func unsafeAssignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
         let nextBufferIdx: Int!
         if startIdx + k > capacity {
             let segmentCount = capacity - startIdx
@@ -358,7 +393,7 @@ extension CircularBuffer {
     
     @usableFromInline
     @discardableResult
-    internal func deinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
+    internal func unsafeDeinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
         let nextBufferIdx: Int!
         if startIdx + count > capacity {
             let segmentCount = capacity - startIdx

@@ -118,17 +118,17 @@ extension CircularBuffer {
             }
             if countToDeinitialize > 0 {
                 let buffIdxStartToDeinit = bufferIndex(from: topStart)
-                deinitializeElements(advancedToBufferIndex: buffIdxStartToDeinit, count: countToDeinitialize)
+                unsafeDeinitializeElements(advancedToBufferIndex: buffIdxStartToDeinit, count: countToDeinitialize)
                 newCount -= countToDeinitialize
                 if let oldNewHead = newHead {
                     let countToMove = topStart - oldNewHead
                     let temp = UnsafeMutablePointer<Element>.allocate(capacity: countToMove)
                     let oldNewHeadBuffIdx = bufferIndex(from: oldNewHead)
-                    moveInitializeFromElements(advancedToBufferIndex: oldNewHeadBuffIdx, count: countToMove, to: temp)
+                    unsafeMoveInitializeFromElements(advancedToBufferIndex: oldNewHeadBuffIdx, count: countToMove, to: temp)
                     let updatedNewHead = oldNewHead + countToDeinitialize
                     newHeadBuffIdx = bufferIndex(from: updatedNewHead)
                     newHead = updatedNewHead
-                    moveInitializeToElements(advancedToBufferIndex: newHeadBuffIdx, from: temp, count: countToMove)
+                    unsafeMoveInitializeToElements(advancedToBufferIndex: newHeadBuffIdx, from: temp, count: countToMove)
                     temp.deallocate()
                 } else {
                     newHead = topIdx
@@ -152,15 +152,15 @@ extension CircularBuffer {
             }
             if countToDeinitialize > 0 {
                 let buffIdxStartToDeinit = incrementBufferIndex(buffIdx)
-                deinitializeElements(advancedToBufferIndex: buffIdxStartToDeinit, count: countToDeinitialize)
+                unsafeDeinitializeElements(advancedToBufferIndex: buffIdxStartToDeinit, count: countToDeinitialize)
                 newCount -= countToDeinitialize
                 if let oldNewLast = newLast {
                     let countToMove = oldNewLast - bottomStart
                     let temp = UnsafeMutablePointer<Element>.allocate(capacity: countToMove)
                     let bottomStartBuffIdx = bufferIndex(from: bottomIdx + 1 + countToDeinitialize)
-                    moveInitializeFromElements(advancedToBufferIndex: bottomStartBuffIdx, count: countToMove, to: temp)
+                    unsafeMoveInitializeFromElements(advancedToBufferIndex: bottomStartBuffIdx, count: countToMove, to: temp)
                     let reInsertBuffIdx = incrementBufferIndex(buffIdx)
-                    moveInitializeToElements(advancedToBufferIndex: reInsertBuffIdx, from: temp, count: countToMove)
+                    unsafeMoveInitializeToElements(advancedToBufferIndex: reInsertBuffIdx, from: temp, count: countToMove)
                     newLast = oldNewLast - countToDeinitialize
                 } else {
                     newLast = bottomIdx
@@ -198,7 +198,7 @@ extension CircularBuffer {
     /// - Returns: The return value, if any, of the `body` closure parameter.
     public func withUnsafeBufferPointer<R>(_ body:(UnsafeBufferPointer<Element>) throws -> R) rethrows -> R {
         if head + count > capacity {
-            fastRotateElementsHeadToZero()
+            makeElementsContiguous()
         }
         
         let buff = UnsafeBufferPointer(start: elements.advanced(by: head), count: count)
@@ -231,7 +231,7 @@ extension CircularBuffer {
     /// - Returns: The return value, if any, of the `body` closure parameter.
     public func withUnsafeMutableBufferPointer<R>(_ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R) rethrows -> R {
         if head + count > capacity {
-            fastRotateElementsHeadToZero()
+            makeElementsContiguous()
         }
         // save actual state:
         let prevElements = elements
