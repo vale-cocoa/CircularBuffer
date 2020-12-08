@@ -260,14 +260,16 @@ extension CircularBuffer {
 // All these methods are manipulating directly the memory buffers of their parameters.
 // It is assumed that preconditions as boundaries checking, allocations count,
 // and correct state of affected memory portions were met before call.
+// They all take into account the possibility that elements could wrap around
+// the last buffer position, i.e. head + count > capacity
+// Indeed they are helpers for move, assign, initialize and deinitialize to and from the
+// buffer operations.
 extension CircularBuffer {
-    // Initializes destination memory pointer from elements buffer,
-    // starting from the element stored at given index in the buffer and
-    // for the given count of elements. It then returns the next valid buffer index after
-    // the last element picked up from the buffer.
-    //
-    // This operation takes into account the fact that the elements might be stored
-    // in the buffer wrapping around the buffer's last position.
+    // Initializes destination memory pointer from elements in buffer,
+    // starting from the one stored at given index and
+    // for the given count of elements.
+    // It then returns the next valid buffer index after
+    // the last initialized one.
     @usableFromInline
     @discardableResult
     internal func unsafeInitializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
@@ -285,6 +287,10 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Initializes elements memory buffer with given collection of elements,
+    // starting from the given buffer position.
+    // It then returns the next valid buffer index after
+    // the last initialized from the given collection.
     @usableFromInline
     @discardableResult
     internal func unsafeInitializeElements<C: Collection>(advancedToBufferIndex startIdx : Int, from newElements: C) -> Int where C.Iterator.Element == Element {
@@ -304,6 +310,10 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Initializes destination memory pointer by moving in it elements form the buffer,
+    // starting from the one stored at given index in the buffer and
+    // for the given count of elements.
+    // It then returns the next valid buffer index after the last moved one.
     @usableFromInline
     @discardableResult
     internal func unsafeMoveInitializeFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
@@ -321,6 +331,9 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Initializes memory buffer starting from given index, with the elements moved from
+    // the other pointer.
+    // It then returns the next valid buffer index after the last initialized one.
     @usableFromInline
     @discardableResult
     internal func unsafeMoveInitializeToElements(advancedToBufferIndex startIdx: Int, from other: UnsafeMutablePointer<Element>, count k: Int) -> Int {
@@ -338,6 +351,10 @@ extension CircularBuffer {
         return nextBuffIdx == capacity ? 0 : nextBuffIdx
     }
     
+    // Assign elements memory buffer with given collection of elements,
+    // starting from the given buffer position.
+    // It then returns the next valid buffer index after
+    // the last modified one.
     @usableFromInline
     @discardableResult
     internal func unsafeAssignElements<C: Collection>(advancedToBufferIndex startIdx: Int, from newElements: C) -> Int where Element == C.Iterator.Element {
@@ -357,6 +374,10 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Assigns destination memory pointer by moving in it elements form the buffer,
+    // starting from the one stored at given index in the buffer and
+    // for the given count of elements.
+    // It then returns the next valid buffer index after the last moved one.
     @usableFromInline
     @discardableResult
     internal func unsafeMoveAssignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
@@ -374,6 +395,10 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Assigns destination memory pointer by copying in it elements form the buffer,
+    // starting from the one stored at given index in the buffer and
+    // for the given count of elements.
+    // It then returns the next valid buffer index after the last copied one.
     @usableFromInline
     @discardableResult
     internal func unsafeAssignFromElements(advancedToBufferIndex startIdx: Int, count k: Int, to destination: UnsafeMutablePointer<Element>) -> Int {
@@ -391,6 +416,9 @@ extension CircularBuffer {
         return nextBufferIdx == capacity ? 0 : nextBufferIdx
     }
     
+    // Deinitializes elements in the buffer, starting from the given buffer index and
+    // in number equal to the specified count value.
+    // It then returns the next valid buffer index after the last deinitialized one.
     @usableFromInline
     @discardableResult
     internal func unsafeDeinitializeElements(advancedToBufferIndex startIdx : Int, count: Int) -> Int {
