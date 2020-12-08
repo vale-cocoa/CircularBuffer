@@ -20,7 +20,7 @@
 
 extension UnsafeMutablePointer {
     // Initializes from a given collection: it's your responsibility
-    //not to go beyond allocated memory.
+    // not to go beyond allocated memory.
     @usableFromInline
     func unsafeInitialize<C: Collection>(from newElements: C) where C.Iterator.Element == Pointee {
         guard !newElements.isEmpty else { return }

@@ -20,6 +20,9 @@
 
 // MARK: - Store new elements
 extension CircularBuffer {
+    // Appends elements from given collection, eventually growing the buffer capacity
+    // by either adopting the smart capacity policy or by resizing capacity to match
+    // exactly the total count of elements resulting from the addition.
     @usableFromInline
     internal func append<C: Collection>(contentsOf newElements: C, usingSmartCapacityPolicy: Bool = true) where C.Iterator.Element == Element {
         let newElementsCount = newElements.count
@@ -41,6 +44,9 @@ extension CircularBuffer {
         }
     }
     
+    // Prepends elements from given collection, eventually growing the buffer capacity
+    // by either adopting the smart capacity policy or by resizing capacity to match
+    // exactly the total count of elements resulting from the addition.
     @inlinable
     internal func prepend<C: Collection>(contentsOf newElements: C, usingSmartCapacityPolicy: Bool = true) where Element == C.Iterator.Element {
         let newElementsCount = newElements.count
@@ -62,6 +68,8 @@ extension CircularBuffer {
         }
     }
     // MARK: - Store new elements in place
+    // Inserts elements from given collection at the specified index, assuming the buffer
+    // has enough free spots to hold them, hence without reallocating memory.
     @usableFromInline
     internal func fastInplaceInsert<C: Collection>(_ newElements: C, at index: Int) where Element == C.Iterator.Element {
         assert(index >= 0 && index <= count)
@@ -104,6 +112,8 @@ extension CircularBuffer {
         tail = incrementBufferIndex(lastBuffIdx - 1)
     }
     
+    // Prepends elements from given collection, assuming the buffer
+    // has enough free spots to hold them, hence without reallocating memory.
     @usableFromInline
     internal func fastInplacePrepend<C: Collection>(_ newElements: C) where Element == C.Iterator.Element {
         let newElementsCount = newElements.count
@@ -116,6 +126,8 @@ extension CircularBuffer {
         head = newHead
     }
     
+    // Appends elements from given collection, assuming the buffer
+    // has enough free spots to hold them, hence without reallocating memory.
     @usableFromInline
     internal func fastInplaceAppend<C: Collection>(_ newElements: C) where Element == C.Iterator.Element {
         let newElementsCount = newElements.count
@@ -129,8 +141,12 @@ extension CircularBuffer {
     
 }
 
-// MARK: - Remove stored elements in place
+// MARK: - Remove or replace stored elements in place
 extension CircularBuffer {
+    // Removes and returns into an Array the elements from the first position
+    // for the specified count number, assuming the buffer has enough stored elements
+    // to supply.
+    // Keeps the buffer capacity.
     @usableFromInline
     internal func fastInplaceRemoveFirstElements(_ k: Int) -> [Element] {
         assert(k >= 0 && k <= count)
@@ -146,6 +162,10 @@ extension CircularBuffer {
         return Array(UnsafeBufferPointer(start: removed, count: k))
     }
     
+    // Removes and returns into an Array the elements from the last position
+    // for the specified count number, assuming the buffer has enough stored elements
+    // to supply.
+    // Keeps the buffer capacity.
     @usableFromInline
     internal func fastInplaceRemoveLastElements(_ k: Int) -> [Element] {
         assert(k >= 0 && k <= count)
@@ -162,6 +182,10 @@ extension CircularBuffer {
         return Array(UnsafeBufferPointer(start: removed, count: k))
     }
     
+    // Removes and returns into an Array the elements from the specified position
+    // for the specified count number, assuming the buffer has enough stored elements
+    // to supply after that position.
+    // Keeps the buffer capacity.
     @usableFromInline
     internal func fastInplaceRemoveElements(at index: Int, count k: Int) -> [Element] {
         assert(index >= 0 && index <= count)
@@ -185,6 +209,9 @@ extension CircularBuffer {
         return Array(UnsafeBufferPointer(start: removed, count: k))
     }
     
+    // Replaces the elements in the buffer at specified bounds, with those in the specified
+    // collection, assuming the bounds are correct and the final count after the operation
+    // would not overflow the current buffer capacity.
     @usableFromInline
     internal func fastInplaceReplaceElements<C: Collection>(subrange: Range<Int>, with newElements: C) where Element == C.Iterator.Element {
         assert(subrange.lowerBound >= 0 && subrange.upperBound <= count)
