@@ -37,7 +37,7 @@ final class ElementsOperationsTests: XCTestCase {
     }
     
     // MARK: - makeElementsContiguous() tests
-    func testFastShiftWrappingElements() {
+    func testMakeElementsContiguous() {
         let elements = (1...10).map { $0 * 10 }
         for headShift in 1..<elements.count {
             let wrappedElementsCount = elements.count - headShift
