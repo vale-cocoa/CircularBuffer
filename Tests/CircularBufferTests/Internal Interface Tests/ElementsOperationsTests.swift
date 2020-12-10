@@ -478,6 +478,24 @@ final class ElementsOperationsTests: XCTestCase {
         }
     }
     
+    func testUnsafeMoveInitializeFromElements_deinitializesMovedElements() {
+        var elements = [Deinitializable]()
+        var deinitializedCount = 0
+        let capacity = 16
+        for i in 0..<16 {
+            let new = Deinitializable(value: i + 1, onDeinit: {_ in deinitializedCount += 1 })
+            elements.append(new)
+        }
+        let testing = CircularBuffer(elements: elements, usingSmartCapacityPolicy: false)
+        elements.removeAll()
+        let dest = UnsafeMutablePointer<Deinitializable>.allocate(capacity: capacity)
+        testing.unsafeMoveInitializeFromElements(advancedToBufferIndex: 0, count: capacity, to: dest)
+        testing.count = 0
+        dest.deinitialize(count: capacity)
+        dest.deallocate()
+        XCTAssertEqual(deinitializedCount, capacity)
+    }
+    
     func testUnsafeMoveInitializeToElements() {
         let capacity = 10
         let other = UnsafeMutablePointer<Int>.allocate(capacity: capacity)
@@ -493,6 +511,27 @@ final class ElementsOperationsTests: XCTestCase {
                 XCTAssertEqual(sut.elements.advanced(by: bIdx).pointee, 100)
             }
         }
+    }
+    
+    func testUnsafeMoveInitializeToElements_deinitializesMovedElements() {
+        var elements = [Deinitializable]()
+        var deinitializedCount = 0
+        let capacity = 16
+        for i in 0..<16 {
+            let new = Deinitializable(value: i + 1, onDeinit: {_ in deinitializedCount += 1 })
+            elements.append(new)
+        }
+        let source = UnsafeMutablePointer<Deinitializable>.allocate(capacity: capacity)
+        elements.withUnsafeBufferPointer { buff in
+            source.initialize(from: buff.baseAddress!, count: capacity)
+        }
+        elements.removeAll()
+        var testing: CircularBuffer<Deinitializable>? = CircularBuffer<Deinitializable>(capacity: capacity, usingSmartCapacityPolicy: false)
+        testing!.unsafeMoveInitializeToElements(advancedToBufferIndex: 0, from: source, count: capacity)
+        testing!.count = capacity
+        testing = nil
+        XCTAssertEqual(deinitializedCount, capacity)
+        source.deallocate()
     }
     
     func testUnsafeAssignElements() {
@@ -563,6 +602,25 @@ final class ElementsOperationsTests: XCTestCase {
         }
     }
     
+    func testUnsafeMoveAssignFromElements_deinitializesMovedElements() {
+        var elements = [Deinitializable]()
+        var deinitializedCount = 0
+        let capacity = 16
+        for i in 0..<16 {
+            let new = Deinitializable(value: i + 1, onDeinit: {_ in deinitializedCount += 1 })
+            elements.append(new)
+        }
+        let testing = CircularBuffer(elements: elements, usingSmartCapacityPolicy: false)
+        elements.removeAll()
+        let dest = UnsafeMutablePointer<Deinitializable>.allocate(capacity: capacity)
+        dest.initialize(repeating: Deinitializable(value: 1000, onDeinit: {_ in }), count: capacity)
+        testing.unsafeMoveAssignFromElements(advancedToBufferIndex: 0, count: capacity, to: dest)
+        testing.count = 0
+        dest.deinitialize(count: capacity)
+        dest.deallocate()
+        XCTAssertEqual(deinitializedCount, capacity)
+    }
+    
     func testUnsafeDeinitializeElements() {
         let capacity = 16
         for buffIdx in 0..<capacity {
@@ -584,6 +642,7 @@ final class ElementsOperationsTests: XCTestCase {
     
 }
 
+// MARK: - Tests helpers
 let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
 
 final class Deinitializable {
@@ -601,46 +660,3 @@ final class Deinitializable {
     }
     
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
