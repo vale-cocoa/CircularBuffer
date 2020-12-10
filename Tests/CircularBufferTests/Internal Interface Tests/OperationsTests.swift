@@ -326,7 +326,78 @@ final class OperationsTests: XCTestCase {
     }
     
     func testFastInplaceReplaceElements() {
-        XCTFail("Ought implement this")
+        let storedElements = (1...10).shuffled()
+        let capacity = 16
+        for headShift in 0..<capacity {
+            for lowerBound in storedElements.startIndex...storedElements.endIndex {
+                for upperBound in lowerBound...storedElements.endIndex {
+                    let subrange = lowerBound..<upperBound
+                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
+                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
+                    sut.count = storedElements.count
+                    sut.head = headShift
+                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    
+                    // newElements is empty:
+                    var prevBaseAddress = sut.elements
+                    sut.fastInplaceReplaceElements(subrange: subrange, with: [])
+                    var expectedResult = storedElements
+                    expectedResult.replaceSubrange(subrange, with: [])
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    XCTAssertEqual(sut.elements, prevBaseAddress)
+                    
+                    // newElements.count < subrange.count:
+                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
+                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
+                    sut.count = storedElements.count
+                    sut.head = headShift
+                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    prevBaseAddress = sut.elements
+                    
+                    var newElements = storedElements[subrange].map { $0 * 10 }
+                    let _ = newElements.popLast()
+                    expectedResult = storedElements
+                    expectedResult.replaceSubrange(subrange, with: newElements)
+                    sut.fastInplaceReplaceElements(subrange: subrange, with: newElements)
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    XCTAssertEqual(sut.elements, prevBaseAddress)
+                    
+                    // newElements.count == subrange.count:
+                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
+                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
+                    sut.count = storedElements.count
+                    sut.head = headShift
+                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    prevBaseAddress = sut.elements
+                    
+                    newElements = storedElements[subrange].map { $0 * 10 }
+                    expectedResult = storedElements
+                    expectedResult.replaceSubrange(subrange, with: newElements)
+                    sut.fastInplaceReplaceElements(subrange: subrange, with: newElements)
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    XCTAssertEqual(sut.elements, prevBaseAddress)
+                    
+                    // newElements.count > subrange.count, won't overflow capacity:
+                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
+                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
+                    sut.count = storedElements.count
+                    sut.head = headShift
+                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    prevBaseAddress = sut.elements
+                    
+                    newElements = storedElements[subrange].map { $0 * 10 }
+                    for i in 0..<sut.residualCapacity {
+                        newElements.append(i + 1000)
+                    }
+                    XCTAssertEqual(sut.count - subrange.count + newElements.count, sut.capacity)
+                    expectedResult = storedElements
+                    expectedResult.replaceSubrange(subrange, with: newElements)
+                    sut.fastInplaceReplaceElements(subrange: subrange, with: newElements)
+                    XCTAssertEqual(sut.allStoredElements, expectedResult)
+                    XCTAssertEqual(sut.elements, prevBaseAddress)
+                }
+            }
+        }
     }
     
 }
