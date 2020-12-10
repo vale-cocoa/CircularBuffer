@@ -1,6 +1,6 @@
 //
 //  CircularBuffer+Utilities.swift
-//  CircularBuffer
+//  CircularBufferTests
 //
 //  Created by Valeriano Della Longa on 2020/12/03.
 //  Copyright © 2020 Valeriano Della Longa. All rights reserved.
@@ -19,15 +19,26 @@
 //
 
 // MARK: - Specific interface for tests and debug only
-#if DEBUG
+import XCTest
+@testable import CircularBuffer
+
 extension CircularBuffer {
     static func headShiftedInstance(contentsOf containedElements: [Element], headShift: Int) -> CircularBuffer {
-        precondition(headShift > 0, "Head shift must be greater than 0")
+        assert(headShift >= 0)
         let minSmartCapacity = headShift >= containedElements.count ? smartCapacityFor(count: containedElements.count + 1) : smartCapacityFor(count: containedElements.count)
         let result = CircularBuffer(capacity: minSmartCapacity)
         result.tail = result.unsafeInitializeElements(advancedToBufferIndex: headShift, from: containedElements)
         result.head = headShift
         result.count = containedElements.count
+        
+        return result
+    }
+    
+    static func headShiftedEmptyInstance(capacity: Int, headShift: Int, usingSmartCapacityPolicy: Bool = true) -> CircularBuffer {
+        assert(capacity >= 0 && headShift >= 0)
+        let result = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: usingSmartCapacityPolicy)
+        result.head = headShift % result.capacity
+        result.tail = result.head
         
         return result
     }
@@ -43,4 +54,3 @@ extension CircularBuffer {
     }
     
 }
-#endif

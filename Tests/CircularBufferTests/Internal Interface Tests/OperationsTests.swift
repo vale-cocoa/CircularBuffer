@@ -61,9 +61,7 @@ final class OperationsTests: XCTestCase {
         let capacityForNewElements = CircularBuffer<Int>.smartCapacityFor(count: newElements.count)
         // when sut is empty:
         for headShift in 0..<capacityForNewElements {
-            sut = CircularBuffer(capacity: capacityForNewElements, usingSmartCapacityPolicy: true)
-            sut.head = headShift
-            sut.tail = headShift
+            sut = CircularBuffer.headShiftedEmptyInstance(capacity: capacityForNewElements, headShift: headShift)
             sut.append(contentsOf: newElements)
             XCTAssertEqual(sut.allStoredElements, newElements)
         }
@@ -72,11 +70,7 @@ final class OperationsTests: XCTestCase {
         let storedElements = (1...10).shuffled()
         let capacityForStoredElements = CircularBuffer<Int>.smartCapacityFor(count: storedElements.count)
         for headShift in 0..<capacityForStoredElements {
-            sut = CircularBuffer(capacity: capacityForStoredElements, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             sut.append(contentsOf: newElements)
             XCTAssertEqual(sut.allStoredElements, storedElements + newElements)
         }
@@ -143,11 +137,7 @@ final class OperationsTests: XCTestCase {
         let storedElements = (1...10).shuffled()
         let capacityForStoredElements = CircularBuffer<Int>.smartCapacityFor(count: storedElements.count)
         for headShift in 0..<capacityForStoredElements {
-            sut = CircularBuffer(capacity: capacityForStoredElements, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             sut.prepend(contentsOf: newElements)
             XCTAssertEqual(sut.allStoredElements, newElements + storedElements)
         }
@@ -184,12 +174,7 @@ final class OperationsTests: XCTestCase {
         let insertedElements = (1...6).map { $0 + 10 }
         for headShift in 0..<capacity {
             for idx in 0...storedElements.count {
-                sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                sut.count = storedElements.count
-                sut.head = headShift
-                sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-                
+                sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                 let prevBuffer = sut.elements
                 sut.fastInplaceInsert([], at: idx)
                 XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -209,12 +194,7 @@ final class OperationsTests: XCTestCase {
         let capacity = 16
         let prependedElements = (1...6).map { $0 + 10 }
         for headShift in 0..<capacity {
-            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-            
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             let prevBuffer = sut.elements
             sut.fastInplacePrepend([])
             XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -231,12 +211,7 @@ final class OperationsTests: XCTestCase {
         let capacity = 16
         let appendedElements = (1...6).map { $0 + 10 }
         for headShift in 0..<capacity {
-            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-            
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             let prevBuffer = sut.elements
             sut.fastInplaceAppend([])
             XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -253,12 +228,7 @@ final class OperationsTests: XCTestCase {
         let storedElements = (1...10).shuffled()
         let capacity = 16
         for headShift in 0..<capacity {
-            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-            
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             let prevBuffer = sut.elements
             XCTAssertEqual(sut.fastInplaceRemoveFirstElements(0), [])
             XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -278,12 +248,7 @@ final class OperationsTests: XCTestCase {
         let storedElements = (1...10).shuffled()
         let capacity = 16
         for headShift in 0..<capacity {
-            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-            sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-            sut.count = storedElements.count
-            sut.head = headShift
-            sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-            
+            sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
             let prevBuffer = sut.elements
             XCTAssertEqual(sut.fastInplaceRemoveLastElements(0), [])
             XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -303,12 +268,7 @@ final class OperationsTests: XCTestCase {
         let capacity = 16
         for headShift in 0..<capacity {
             for idx in 0..<storedElements.endIndex {
-                sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                sut.count = storedElements.count
-                sut.head = headShift
-                sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-                
+                sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                 let prevBuffer = sut.elements
                 XCTAssertEqual(sut.fastInplaceRemoveElements(at: idx, count: 0), [])
                 XCTAssertEqual(sut.allStoredElements, storedElements)
@@ -332,13 +292,8 @@ final class OperationsTests: XCTestCase {
             for lowerBound in storedElements.startIndex...storedElements.endIndex {
                 for upperBound in lowerBound...storedElements.endIndex {
                     let subrange = lowerBound..<upperBound
-                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                    sut.count = storedElements.count
-                    sut.head = headShift
-                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
-                    
                     // newElements is empty:
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                     var prevBaseAddress = sut.elements
                     sut.fastInplaceReplaceElements(subrange: subrange, with: [])
                     var expectedResult = storedElements
@@ -347,11 +302,7 @@ final class OperationsTests: XCTestCase {
                     XCTAssertEqual(sut.elements, prevBaseAddress)
                     
                     // newElements.count < subrange.count:
-                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                    sut.count = storedElements.count
-                    sut.head = headShift
-                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                     prevBaseAddress = sut.elements
                     
                     var newElements = storedElements[subrange].map { $0 * 10 }
@@ -363,11 +314,7 @@ final class OperationsTests: XCTestCase {
                     XCTAssertEqual(sut.elements, prevBaseAddress)
                     
                     // newElements.count == subrange.count:
-                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                    sut.count = storedElements.count
-                    sut.head = headShift
-                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                     prevBaseAddress = sut.elements
                     
                     newElements = storedElements[subrange].map { $0 * 10 }
@@ -378,11 +325,7 @@ final class OperationsTests: XCTestCase {
                     XCTAssertEqual(sut.elements, prevBaseAddress)
                     
                     // newElements.count > subrange.count, won't overflow capacity:
-                    sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: true)
-                    sut.unsafeInitializeElements(advancedToBufferIndex: headShift, from: storedElements)
-                    sut.count = storedElements.count
-                    sut.head = headShift
-                    sut.tail = sut.bufferIndex(from: headShift, offsetBy: storedElements.count)
+                    sut = CircularBuffer.headShiftedInstance(contentsOf: storedElements, headShift: headShift)
                     prevBaseAddress = sut.elements
                     
                     newElements = storedElements[subrange].map { $0 * 10 }
