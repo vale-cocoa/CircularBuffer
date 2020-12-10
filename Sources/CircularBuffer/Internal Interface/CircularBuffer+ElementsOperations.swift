@@ -29,6 +29,7 @@ extension CircularBuffer {
     // Returned value is clamped to Int.max, and given value must not be negative.
     @usableFromInline
     static func smartCapacityFor(count: Int) -> Int {
+        assert(count >= 0)
         guard count > (minSmartCapacity >> 1) else { return minSmartCapacity }
         
         guard count < ((Int.max >> 1) + 1) else { return Int.max }
@@ -41,7 +42,7 @@ extension CircularBuffer {
     @usableFromInline
     internal func growToNextSmartCapacityLevel() {
         precondition(capacity < Int.max, "Can't grow capacity more than Int.max value: \(Int.max)")
-        let newCapacity = capacity << 1
+        let newCapacity = Self.smartCapacityFor(count: capacity) << 1
         fastResizeElements(to: newCapacity)
     }
     
@@ -71,14 +72,16 @@ extension CircularBuffer {
             return usingSmartCapacityPolicy ? Self.minSmartCapacity : 0
         }
         
-        let minCapacity = usingSmartCapacityPolicy ? (Self.minSmartCapacity << 2) : newCount
-        let candidateCapacity = usingSmartCapacityPolicy ? capacity >> 2 : newCount
-        guard
-            capacity >= minCapacity,
-            candidateCapacity >= newCount
-        else { return capacity }
+        guard usingSmartCapacityPolicy else { return newCount }
         
-        return candidateCapacity
+        let actualSmartCapacityValue = Self.smartCapacityFor(count: capacity)
+        guard
+            actualSmartCapacityValue > Self.minSmartCapacity
+        else { return actualSmartCapacityValue }
+            
+        let candidateSmartCapacityValue = Self.smartCapacityFor(count: newCount)
+            
+        return candidateSmartCapacityValue <= (actualSmartCapacityValue >> 2) ? candidateSmartCapacityValue : actualSmartCapacityValue
     }
     
     // Eventually resize the buffer to a smaller capacity suitable for current count of
@@ -95,15 +98,19 @@ extension CircularBuffer {
             return
         }
         
-        let minCapacity = usingSmartCapacityPolicy ? (Self.minSmartCapacity << 2) : count
-        let candidateCapacity = usingSmartCapacityPolicy ? capacity >> 2 : count
-        
         guard
-            capacity >= minCapacity,
-            candidateCapacity >= count
-        else { return }
+            usingSmartCapacityPolicy
+        else {
+            if count < capacity { fastResizeElements(to: count) }
+            
+            return
+        }
         
-        fastResizeElements(to: candidateCapacity)
+        let candidateCapacity = Self.smartCapacityFor(count: count)
+        let actualSmartCapacity = Self.smartCapacityFor(count: capacity)
+        if actualSmartCapacity != capacity || candidateCapacity <= capacity >> 2 {
+            fastResizeElements(to: candidateCapacity)
+        }
     }
     
     // Shift the elements in the buffer so they won't wrap around the last buffer position,
@@ -158,6 +165,7 @@ extension CircularBuffer {
     @usableFromInline
     internal func fastResizeElements<C: Collection>(to newCapacity: Int, insert newElements: C, at index: Int) where C.Iterator.Element == Element {
         assert(newCapacity >= count + newElements.count)
+        assert(index >= 0 && index <= count)
         let newBuffer = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         
         // copy newElements inside newBuffer
@@ -213,13 +221,14 @@ extension CircularBuffer {
         let buffIdx = bufferIndex(from: subrange.lowerBound)
         let newBuffer = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         let newElementsCount = newElements.count
-        assert(newCapacity >= newElementsCount)
+        let newCount = count - subrange.count + newElementsCount
+        assert(newCapacity >= newCount)
         
         let countOfFirstSplit = subrange.lowerBound
         let countOfSecondSplit = count - countOfFirstSplit - subrange.count
         
         // Deinitialize in elements the replaced subrange and obtain the
-        // buffer index to second split of elements to move from elements:
+        // buffer index to second split of elements to move from:
         let secondSplitStartBuffIdx = unsafeDeinitializeElements(advancedToBufferIndex: buffIdx, count: subrange.count)
         
         // Now move everything in newBuff…
@@ -244,7 +253,7 @@ extension CircularBuffer {
         elements = newBuffer
         // Update capacity, count, head and tail to new values:
         capacity = newCapacity
-        count = count - subrange.count + newElementsCount
+        count = newCount
         head = 0
         tail = incrementBufferIndex(count - 1)
     }

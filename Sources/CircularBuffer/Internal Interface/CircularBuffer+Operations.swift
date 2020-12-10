@@ -67,6 +67,7 @@ extension CircularBuffer {
             fastResizeElements(to: newCapacity, insert: newElements, at: 0)
         }
     }
+    
     // MARK: - Store new elements in place
     // Inserts elements from given collection at the specified index, assuming the buffer
     // has enough free spots to hold them, hence without reallocating memory.
@@ -254,4 +255,5 @@ extension CircularBuffer {
         count = count - subrange.count + newElementsCount
         tail = incrementBufferIndex(lastBuffIdx - 1)
     }
+    
 }
