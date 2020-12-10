@@ -392,20 +392,3 @@ final class ClosureBasedOperationsTests: XCTestCase {
     
 }
 
-// MARK: - Helpers for tests
-let testsThrownError = NSError(domain: "com.vdl.circularBuffer", code: 1, userInfo: nil)
-
-// MARK: - Common predicates and closures
-let throwingBody: (Int) throws -> Void = { _ in throw testsThrownError }
-
-let isEvenPredicate: (Int) -> Bool = { $0 % 2 == 0 }
-
-let throwingPredicate: (Int) throws -> Bool = { _ in throw testsThrownError }
-
-let multiplyByTenTransform: (Int) -> Int = { $0 * 10 }
-
-let throwingTransform: (Int) throws -> Int = { _ in throw testsThrownError }
-
-let isEvenOptionalTransform: (Int) -> Int? = { isEvenPredicate($0) ? $0 : nil }
-
-let throwingOptionalTransform: (Int) throws -> Int? = { _ in throw testsThrownError }

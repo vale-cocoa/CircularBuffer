@@ -1628,38 +1628,3 @@ final class AddElementsOperationsTests: XCTestCase {
         }
     }
 }
-
-struct TestSequence<Element>: Sequence {
-    let containedElements: [Element]
-    
-    let implementsWithContiguousStorage: Bool
-    
-    let underEstimatedCountMatchesCount: Bool
-    
-    init(elements: [Element], implementsWithContiguousStorage: Bool = true, underEstimatedCountMatchesCount: Bool = true) {
-        self.containedElements = elements
-        self.implementsWithContiguousStorage = implementsWithContiguousStorage
-        self.underEstimatedCountMatchesCount = underEstimatedCountMatchesCount
-    }
-    
-    var underestimatedCount: Int { return underEstimatedCountMatchesCount ? containedElements.count : 0 }
-    
-    func makeIterator() -> AnyIterator<Element> {
-        var idx = 0
-        
-        return AnyIterator {
-            guard idx < containedElements.count else { return nil }
-            
-            defer { idx += 1 }
-            
-            return containedElements[idx]
-        }
-    }
-    
-    func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
-        guard implementsWithContiguousStorage else { return nil }
-        
-        return try containedElements.withUnsafeBufferPointer(body)
-    }
-    
-}

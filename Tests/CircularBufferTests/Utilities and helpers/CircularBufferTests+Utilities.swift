@@ -54,7 +54,40 @@ extension CircularBuffer {
     
 }
 
-let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+struct TestSequence<Element>: Sequence {
+    let containedElements: [Element]
+    
+    let implementsWithContiguousStorage: Bool
+    
+    let underEstimatedCountMatchesCount: Bool
+    
+    init(elements: [Element], implementsWithContiguousStorage: Bool = true, underEstimatedCountMatchesCount: Bool = true) {
+        self.containedElements = elements
+        self.implementsWithContiguousStorage = implementsWithContiguousStorage
+        self.underEstimatedCountMatchesCount = underEstimatedCountMatchesCount
+    }
+    
+    var underestimatedCount: Int { return underEstimatedCountMatchesCount ? containedElements.count : 0 }
+    
+    func makeIterator() -> AnyIterator<Element> {
+        var idx = 0
+        
+        return AnyIterator {
+            guard idx < containedElements.count else { return nil }
+            
+            defer { idx += 1 }
+            
+            return containedElements[idx]
+        }
+    }
+    
+    func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
+        guard implementsWithContiguousStorage else { return nil }
+        
+        return try containedElements.withUnsafeBufferPointer(body)
+    }
+    
+}
 
 final class Deinitializable {
     let value: Int
@@ -71,3 +104,21 @@ final class Deinitializable {
     }
     
 }
+
+let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+
+let testsThrownError = NSError(domain: "com.vdl.circularBuffer", code: 1, userInfo: nil)
+
+let throwingBody: (Int) throws -> Void = { _ in throw testsThrownError }
+
+let isEvenPredicate: (Int) -> Bool = { $0 % 2 == 0 }
+
+let throwingPredicate: (Int) throws -> Bool = { _ in throw testsThrownError }
+
+let multiplyByTenTransform: (Int) -> Int = { $0 * 10 }
+
+let throwingTransform: (Int) throws -> Int = { _ in throw testsThrownError }
+
+let isEvenOptionalTransform: (Int) -> Int? = { isEvenPredicate($0) ? $0 : nil }
+
+let throwingOptionalTransform: (Int) throws -> Int? = { _ in throw testsThrownError }
