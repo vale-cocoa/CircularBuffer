@@ -414,11 +414,199 @@ final class ElementsOperationsTests: XCTestCase {
     }
     
     // MARK: - Unsafe operations tests
+    func testUnsafeInitializeFromElements() {
+        let storedElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: storedElements, usingSmartCapacityPolicy: false)
+        let k = 5
+        let dest = UnsafeMutablePointer<Int>.allocate(capacity: k)
+        for idx in storedElements.startIndex..<storedElements.endIndex {
+            let startBuffIdx = sut.bufferIndex(from: idx)
+            let buffIdxResult = sut.unsafeInitializeFromElements(advancedToBufferIndex: startBuffIdx, count: k, to: dest)
+            let expectedBufferIdx = (idx + k) % storedElements.count
+            XCTAssertEqual(buffIdxResult, expectedBufferIdx)
+            let expectedResult: Array<Int>!
+            if idx + k >= storedElements.endIndex {
+                let firstChunckCount = storedElements.endIndex - idx
+                let firstChunk = Array(storedElements[idx..<idx + firstChunckCount])
+                let secondChunkCount = k - firstChunckCount
+                let secondChunk = Array(storedElements[storedElements.startIndex..<secondChunkCount])
+                expectedResult = firstChunk + secondChunk
+            } else {
+                expectedResult = Array(storedElements[idx..<(idx + k)])
+            }
+            XCTAssertEqual(Array(UnsafeBufferPointer(start: dest, count: k)), expectedResult)
+            dest.deinitialize(count: k)
+        }
+    }
     
+    func testsUnsafeInitializeElements() {
+        let elements = (1...10).shuffled()
+        let capacity = 32
+        for buffIdx in 0..<capacity {
+            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: false)
+            let nextBuffIdx = sut.unsafeInitializeElements(advancedToBufferIndex: buffIdx, from: elements)
+            let expectedBuffIdx = (buffIdx + elements.count) % capacity
+            XCTAssertEqual(nextBuffIdx, expectedBuffIdx)
+            for idx in 0..<elements.count {
+                XCTAssertEqual(sut.elements.advanced(by: (buffIdx + idx) % capacity).pointee, elements[idx])
+            }
+        }
+    }
+    
+    func testUnsafeMoveInitializeFromElements() {
+        let storedElements = (1...10).shuffled()
+        let k = 5
+        let dest = UnsafeMutablePointer<Int>.allocate(capacity: k)
+        for idx in storedElements.startIndex..<storedElements.endIndex {
+            sut = CircularBuffer(elements: storedElements, usingSmartCapacityPolicy: false)
+            let startBuffIdx = sut.bufferIndex(from: idx)
+            let buffIdxResult = sut.unsafeMoveInitializeFromElements(advancedToBufferIndex: startBuffIdx, count: k, to: dest)
+            let expectedBufferIdx = (idx + k) % storedElements.count
+            XCTAssertEqual(buffIdxResult, expectedBufferIdx)
+            let expectedResult: Array<Int>!
+            if idx + k >= storedElements.endIndex {
+                let firstChunckCount = storedElements.endIndex - idx
+                let firstChunk = Array(storedElements[idx..<idx + firstChunckCount])
+                let secondChunkCount = k - firstChunckCount
+                let secondChunk = Array(storedElements[storedElements.startIndex..<secondChunkCount])
+                expectedResult = firstChunk + secondChunk
+            } else {
+                expectedResult = Array(storedElements[idx..<(idx + k)])
+            }
+            XCTAssertEqual(Array(UnsafeBufferPointer(start: dest, count: k)), expectedResult)
+            dest.deinitialize(count: k)
+        }
+    }
+    
+    func testUnsafeMoveInitializeToElements() {
+        let capacity = 10
+        let other = UnsafeMutablePointer<Int>.allocate(capacity: capacity)
+        other.initialize(repeating: 100, count: capacity)
+        for idx in 0..<capacity {
+            sut = CircularBuffer(capacity: capacity, usingSmartCapacityPolicy: false)
+            let buffIdx = sut.bufferIndex(from: idx)
+            let nextBuffIdx = sut.unsafeMoveInitializeToElements(advancedToBufferIndex: buffIdx, from: other, count: capacity)
+            let expectedBufferIdx = (buffIdx + capacity) % capacity
+            XCTAssertEqual(nextBuffIdx, expectedBufferIdx)
+            for offset in 0..<capacity {
+                let bIdx = (buffIdx + offset) % capacity
+                XCTAssertEqual(sut.elements.advanced(by: bIdx).pointee, 100)
+            }
+        }
+    }
+    
+    func testUnsafeAssignElements() {
+        let newElements = Array(1...10)
+        let capacity = 10
+        for idx in 0..<capacity {
+            sut = CircularBuffer(repeating: 1000, count: capacity, usingSmartCapacityPolicy: false)
+            let buffIdx = sut.bufferIndex(from: idx)
+            let nextBufferIdx = sut.unsafeAssignElements(advancedToBufferIndex: buffIdx, from: newElements)
+            let expectedNextBuffIdx = (buffIdx + newElements.count) % sut.capacity
+            XCTAssertEqual(nextBufferIdx, expectedNextBuffIdx)
+            for offset in 0..<newElements.count {
+                let bIdx = (buffIdx + offset) % capacity
+                XCTAssertEqual(sut.elements.advanced(by: bIdx).pointee, newElements[offset])
+            }
+        }
+    }
+    
+    func testUnsafeAssignFromElements() {
+        let storedElements = (1...10).shuffled()
+        sut = CircularBuffer(elements: storedElements, usingSmartCapacityPolicy: false)
+        let k = 5
+        let dest = UnsafeMutablePointer<Int>.allocate(capacity: k)
+        for idx in storedElements.startIndex..<storedElements.endIndex {
+            dest.initialize(repeating: 1000, count: k)
+            let startBuffIdx = sut.bufferIndex(from: idx)
+            let buffIdxResult = sut.unsafeAssignFromElements(advancedToBufferIndex: startBuffIdx, count: k, to: dest)
+            let expectedBufferIdx = (idx + k) % storedElements.count
+            XCTAssertEqual(buffIdxResult, expectedBufferIdx)
+            let expectedResult: Array<Int>!
+            if idx + k >= storedElements.endIndex {
+                let firstChunckCount = storedElements.endIndex - idx
+                let firstChunk = Array(storedElements[idx..<idx + firstChunckCount])
+                let secondChunkCount = k - firstChunckCount
+                let secondChunk = Array(storedElements[storedElements.startIndex..<secondChunkCount])
+                expectedResult = firstChunk + secondChunk
+            } else {
+                expectedResult = Array(storedElements[idx..<(idx + k)])
+            }
+            XCTAssertEqual(Array(UnsafeBufferPointer(start: dest, count: k)), expectedResult)
+            dest.deinitialize(count: k)
+        }
+    }
+    
+    func testUnsafeMoveAssignFromElements() {
+        let storedElements = (1...10).shuffled()
+        let k = 5
+        let dest = UnsafeMutablePointer<Int>.allocate(capacity: k)
+        for idx in storedElements.startIndex..<storedElements.endIndex {
+            sut = CircularBuffer(elements: storedElements, usingSmartCapacityPolicy: false)
+            dest.initialize(repeating: 1000, count: k)
+            let startBuffIdx = sut.bufferIndex(from: idx)
+            let buffIdxResult = sut.unsafeMoveAssignFromElements(advancedToBufferIndex: startBuffIdx, count: k, to: dest)
+            let expectedBufferIdx = (idx + k) % storedElements.count
+            XCTAssertEqual(buffIdxResult, expectedBufferIdx)
+            let expectedResult: Array<Int>!
+            if idx + k >= storedElements.endIndex {
+                let firstChunckCount = storedElements.endIndex - idx
+                let firstChunk = Array(storedElements[idx..<idx + firstChunckCount])
+                let secondChunkCount = k - firstChunckCount
+                let secondChunk = Array(storedElements[storedElements.startIndex..<secondChunkCount])
+                expectedResult = firstChunk + secondChunk
+            } else {
+                expectedResult = Array(storedElements[idx..<(idx + k)])
+            }
+            XCTAssertEqual(Array(UnsafeBufferPointer(start: dest, count: k)), expectedResult)
+            dest.deinitialize(count: k)
+        }
+    }
+    
+    func testUnsafeDeinitializeElements() {
+        let capacity = 16
+        for buffIdx in 0..<capacity {
+            var onDeinitCalls = 0
+            var elements = [Deinitializable]()
+            for i in 0..<capacity {
+                let new = Deinitializable(value: i, onDeinit: { _ in onDeinitCalls += 1 })
+                elements.append(new)
+            }
+            let testing = CircularBuffer<Deinitializable>(elements: elements, usingSmartCapacityPolicy: false)
+            elements.removeAll()
+            let nextBuffIdx = testing.unsafeDeinitializeElements(advancedToBufferIndex: buffIdx, count: 16)
+            testing.count = 0
+            let expectedNextBuffIdx = (buffIdx + 16) % 16
+            XCTAssertEqual(nextBuffIdx, expectedNextBuffIdx)
+            XCTAssertEqual(onDeinitCalls, capacity)
+        }
+    }
     
 }
 
 let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+
+final class Deinitializable {
+    let value: Int
+    
+    let onDeinit: (Int) -> Void
+    
+    init(value: Int, onDeinit: @escaping (Int) -> Void ) {
+        self.value = value
+        self.onDeinit = onDeinit
+    }
+    
+    deinit {
+        onDeinit(self.value)
+    }
+    
+}
+
+
+
+
+
+
 
 
 
