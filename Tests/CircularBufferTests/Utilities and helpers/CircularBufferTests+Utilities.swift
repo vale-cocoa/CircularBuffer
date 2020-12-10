@@ -1,5 +1,5 @@
 //
-//  CircularBuffer+Utilities.swift
+//  CircularBufferTests+Utilities.swift
 //  CircularBufferTests
 //
 //  Created by Valeriano Della Longa on 2020/12/03.
@@ -18,7 +18,6 @@
 //  IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
-// MARK: - Specific interface for tests and debug only
 import XCTest
 @testable import CircularBuffer
 
@@ -51,6 +50,24 @@ extension CircularBuffer {
         }
         
         return result
+    }
+    
+}
+
+let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
+
+final class Deinitializable {
+    let value: Int
+    
+    let onDeinit: (Int) -> Void
+    
+    init(value: Int, onDeinit: @escaping (Int) -> Void ) {
+        self.value = value
+        self.onDeinit = onDeinit
+    }
+    
+    deinit {
+        onDeinit(self.value)
     }
     
 }

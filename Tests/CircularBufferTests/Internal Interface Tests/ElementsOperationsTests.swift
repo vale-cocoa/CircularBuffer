@@ -642,21 +642,4 @@ final class ElementsOperationsTests: XCTestCase {
     
 }
 
-// MARK: - Tests helpers
-let minSmartCapacity = CircularBuffer<Int>.minSmartCapacity
 
-final class Deinitializable {
-    let value: Int
-    
-    let onDeinit: (Int) -> Void
-    
-    init(value: Int, onDeinit: @escaping (Int) -> Void ) {
-        self.value = value
-        self.onDeinit = onDeinit
-    }
-    
-    deinit {
-        onDeinit(self.value)
-    }
-    
-}
