@@ -53,7 +53,8 @@ extension CircularBuffer {
         
         if amount > 0 {
             
-            return bufferIdx == (capacity - 1) ? amount : ((bufferIdx + amount) > capacity ? (amount - (capacity - bufferIdx)) : bufferIdx + amount == capacity ? 0 : bufferIdx + amount)
+            let increased = bufferIdx + amount
+            return increased < capacity ? increased : (increased == capacity ? 0 : (amount - (capacity - bufferIdx)))
         } else {
             
             return bufferIdx == 0 ? capacity + amount : ((bufferIdx + amount) < 0 ? (capacity - (-amount - bufferIdx)) : bufferIdx + amount)
