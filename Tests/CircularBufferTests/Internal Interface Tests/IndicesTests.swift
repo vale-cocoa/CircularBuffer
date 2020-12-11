@@ -37,19 +37,54 @@ final class IndicesTests: XCTestCase {
     }
     
     func testBufferIndexFrom() {
-        XCTFail("Ought implement this")
+        let capacity = 16
+        for headShift in 1..<capacity {
+            sut = CircularBuffer.headShiftedEmptyInstance(capacity: capacity, headShift: headShift)
+            for position in 0..<sut.capacity {
+                let result = sut.bufferIndex(from: position)
+                XCTAssertTrue(0..<sut.capacity ~= result)
+                let expectedResult = headShift + position < capacity ? headShift + position : (headShift + position - capacity)
+                XCTAssertEqual(result, expectedResult)
+            }
+        }
     }
     
     func testIncrementBufferIndex() {
-        XCTFail("Ought implement this")
+        let capacity = 16
+        for headShift in 1..<capacity {
+            sut = CircularBuffer.headShiftedEmptyInstance(capacity: capacity, headShift: headShift)
+            for bIdx in 0..<sut.capacity {
+                let result = sut.incrementBufferIndex(bIdx)
+                XCTAssertTrue(0..<sut.capacity ~= result)
+            }
+        }
     }
+    
     
     func testDecrementBufferIndex() {
-        XCTFail("Ought implement this")
+        let capacity = 16
+        for headShift in 1..<capacity {
+            sut = CircularBuffer.headShiftedEmptyInstance(capacity: capacity, headShift: headShift)
+            for bIdx in 0..<sut.capacity {
+                let result = sut.decrementBufferIndex(bIdx)
+                XCTAssertTrue(0..<sut.capacity ~= result)
+            }
+        }
     }
     
+    
     func testBufferIndexFromOffsetBy() {
-        XCTFail("Ought implement this")
+        let capacity = 16
+        for headShift in 1..<capacity {
+            sut = CircularBuffer.headShiftedEmptyInstance(capacity: capacity, headShift: headShift)
+            let doubledCapacity = sut.capacity * 2
+            for bIdx in 0..<sut.capacity {
+                for offset in stride(from: -doubledCapacity, through: doubledCapacity , by: 1) {
+                    let result = sut.offsettedBufferIndex(from: bIdx, offsetBy: offset)
+                    XCTAssertTrue(0..<sut.capacity ~= result)
+                }
+            }
+        }
     }
     
 }

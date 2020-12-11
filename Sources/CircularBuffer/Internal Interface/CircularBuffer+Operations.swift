@@ -121,7 +121,7 @@ extension CircularBuffer {
         guard newElementsCount > 0 else { return }
         assert(newElementsCount <= residualCapacity)
         
-        let newHead = bufferIndex(from: head, offsetBy: -newElementsCount)
+        let newHead = offsettedBufferIndex(from: head, offsetBy: -newElementsCount)
         unsafeInitializeElements(advancedToBufferIndex: newHead, from: newElements)
         count += newElementsCount
         head = newHead

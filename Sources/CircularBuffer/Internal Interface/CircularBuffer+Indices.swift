@@ -45,20 +45,13 @@ extension CircularBuffer {
     }
     
     @usableFromInline
-    internal func bufferIndex(from bufferIdx: Int, offsetBy offset: Int) -> Int {
-        guard offset != 0 else { return bufferIdx }
-        
+    internal func offsettedBufferIndex(from bufferIdx: Int, offsetBy offset: Int) -> Int {
         let amount = offset % capacity
         guard amount != 0 else { return bufferIdx }
         
-        if amount > 0 {
-            
-            let increased = bufferIdx + amount
-            return increased < capacity ? increased : (increased == capacity ? 0 : (amount - (capacity - bufferIdx)))
-        } else {
-            
-            return bufferIdx == 0 ? capacity + amount : ((bufferIdx + amount) < 0 ? (capacity - (-amount - bufferIdx)) : bufferIdx + amount)
-        }
+        let offsetted = bufferIdx + amount
+        
+        return offsetted >= 0 ? (offsetted < capacity ? offsetted : offsetted - capacity) : offsetted + capacity
     }
     
 }

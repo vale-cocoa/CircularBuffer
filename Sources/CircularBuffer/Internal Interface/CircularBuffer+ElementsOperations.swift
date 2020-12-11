@@ -124,14 +124,14 @@ extension CircularBuffer {
         let headElementsCount = capacity - head
         var newHead: Int!
         if residualCapacity < wrappingElementsCount {
-            newHead = bufferIndex(from: head, offsetBy: -wrappingElementsCount)
+            newHead = offsettedBufferIndex(from: head, offsetBy: -wrappingElementsCount)
             let swap = UnsafeMutablePointer<Element>.allocate(capacity: wrappingElementsCount)
             swap.moveInitialize(from: elements, count: wrappingElementsCount)
             elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
             elements.advanced(by: newHead + headElementsCount).moveInitialize(from: swap, count: wrappingElementsCount)
             swap.deallocate()
         } else if wrappingElementsCount <= headElementsCount {
-            newHead = bufferIndex(from: head, offsetBy: -wrappingElementsCount)
+            newHead = offsettedBufferIndex(from: head, offsetBy: -wrappingElementsCount)
             elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
             elements.advanced(by: newHead + headElementsCount).moveInitialize(from: elements, count: wrappingElementsCount)
         } else {
@@ -140,7 +140,7 @@ extension CircularBuffer {
             elements.advanced(by: newHead).moveInitialize(from: elements.advanced(by: head), count: headElementsCount)
         }
         head = newHead
-        tail = bufferIndex(from: head, offsetBy: count)
+        tail = offsettedBufferIndex(from: head, offsetBy: count)
     }
     
     // Resizes buffer to specified capacity value, which is assumed to be enough to
