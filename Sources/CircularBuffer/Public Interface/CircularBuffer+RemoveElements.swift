@@ -48,7 +48,7 @@ extension CircularBuffer {
     /// - Complexity: O(1)
     /// - Note: This method effectively uses the storage as a ring buffer.
     @discardableResult
-    func popFront() -> Element? {
+    public func popFront() -> Element? {
         guard !isEmpty else { return nil }
         
         let firstElement = elements.advanced(by: head).move()
