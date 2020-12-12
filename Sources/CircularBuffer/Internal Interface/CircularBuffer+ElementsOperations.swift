@@ -30,9 +30,7 @@ extension CircularBuffer {
     @usableFromInline
     static func smartCapacityFor(count: Int) -> Int {
         assert(count >= 0)
-        guard count > (minSmartCapacity >> 1) else { return minSmartCapacity }
-        
-        guard count < ((Int.max >> 1) + 1) else { return Int.max }
+        guard count > minSmartCapacity else { return minSmartCapacity }
         
         return 1 << (Int.bitWidth - (count - 1).leadingZeroBitCount)
     }
@@ -48,7 +46,7 @@ extension CircularBuffer {
     
     // Returns an adeguate capacity value to store the specified new count of elements,
     // taking into account whether we want to use the smart capacity policy in doing the
-    // calcultion or not, if we want to keep capacity or not in case we are specifying a
+    // calcultion or not, and if we want to keep capacity or not in case we are specifying a
     // newCount value which is less than the actual count.
     @usableFromInline
     internal func capacityFor(newCount: Int, keepCapacity: Bool = true, usingSmartCapacityPolicy: Bool = true) -> Int {
@@ -89,6 +87,20 @@ extension CircularBuffer {
     // as per specified value of usingSmartCapacityPolicy parameter.
     @usableFromInline
     internal func reduceCapacityForCurrentCount(usingSmartCapacityPolicy: Bool = true) {
+        guard
+            usingSmartCapacityPolicy
+        else {
+            if count < capacity { fastResizeElements(to: count) }
+            
+            return
+        }
+        
+        let candidateCapacity = Self.smartCapacityFor(count: count)
+        if (isEmpty && capacity > candidateCapacity) || candidateCapacity <= capacity >> 2 {
+            fastResizeElements(to: candidateCapacity)
+        }
+        
+        /*
         guard !isEmpty else {
             let minCapacity = usingSmartCapacityPolicy ? Self.minSmartCapacity : 0
             if capacity > minCapacity {
@@ -111,6 +123,7 @@ extension CircularBuffer {
         if actualSmartCapacity != capacity || candidateCapacity <= capacity >> 2 {
             fastResizeElements(to: candidateCapacity)
         }
+        */
     }
     
     // Shift the elements in the buffer so they won't wrap around the last buffer position,

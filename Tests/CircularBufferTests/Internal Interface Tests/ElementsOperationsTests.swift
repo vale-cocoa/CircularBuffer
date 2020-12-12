@@ -38,16 +38,8 @@ final class ElementsOperationsTests: XCTestCase {
     
     // MARK: - smartCapacityFor(count:) tests
     func testSmartCapacityFor() {
-        // When specified count is 0:
-        XCTAssertEqual(CircularBuffer<Int>.smartCapacityFor(count: 0), minSmartCapacity)
-        
-        // when specified value is in range ((Int.max >> 1) + 1)...Int.max:
-        XCTAssertEqual(CircularBuffer<Int>.smartCapacityFor(count: (Int.max >> 1) + 1), Int.max)
-        XCTAssertEqual(CircularBuffer<Int>.smartCapacityFor(count: Int.max - 1), Int.max)
-        XCTAssertEqual(CircularBuffer<Int>.smartCapacityFor(count: Int.max), Int.max)
-        
         // when specified value is smaller than or equal to minSmartCapacity:
-        for k in 1...minSmartCapacity {
+        for k in 0...minSmartCapacity {
             XCTAssertEqual(CircularBuffer<Int>.smartCapacityFor(count: k), minSmartCapacity)
         }
         
@@ -218,19 +210,6 @@ final class ElementsOperationsTests: XCTestCase {
         sut.reduceCapacityForCurrentCount(usingSmartCapacityPolicy: true)
         XCTAssertEqual(sut.capacity, prevCapacity)
         XCTAssertEqual(sut.elements, prevBaseAddress)
-        XCTAssertEqual(sut.allStoredElements, storedElements)
-        
-        // when usingSmartCapacity == true and capacity is not a smart capacity value,
-        // then it resize to smart capacity value for current count:
-        sut = CircularBuffer(elements: storedElements)
-        sut.reserveCapacity(10, usingSmartCapacityPolicy: false)
-        XCTAssertNotEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.capacity))
-        prevCapacity = sut.capacity
-        prevBaseAddress = sut.elements
-        sut.reduceCapacityForCurrentCount(usingSmartCapacityPolicy: true)
-        XCTAssertNotEqual(sut.capacity, prevCapacity)
-        XCTAssertEqual(sut.capacity, CircularBuffer<Int>.smartCapacityFor(count: sut.count))
-        XCTAssertNotEqual(sut.elements, prevBaseAddress)
         XCTAssertEqual(sut.allStoredElements, storedElements)
     }
     

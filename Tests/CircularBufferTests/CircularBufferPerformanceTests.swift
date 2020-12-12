@@ -21,97 +21,110 @@
 import XCTest
 @testable import CircularBuffer
 
-
 final class CircularBufferPerformanceTests: XCTestCase {
+    var sut: (outerCount: Int, innerCount: Int)!
+    
     // MARK: - performance tests
     func testCircularBufferPerformance_smallCount() {
-        measure(performanceLoopCircularBuffer_smallCount)
+        whenSmallCount()
+        measure { performanceLoop(for: .circularBuffer) }
     }
     
     func testArrayPerformance_smallCount() {
-        measure(performanceLoopArray_smallCount)
+        whenSmallCount()
+        measure { performanceLoop(for: .array) }
     }
     
     func testCircularBufferPerformance_largeCount() {
-        measure(performanceLoopCircularBuffer_largeCount)
+        whenLargeCount()
+        measure { performanceLoop(for: .circularBuffer) }
     }
     
     func testArrayPerformance_largeCount() {
-        measure(performanceLoopArray_largeCount)
+        whenLargeCount()
+        measure { performanceLoop(for: .array) }
     }
     
-    private func performanceLoopCircularBuffer_smallCount() {
-        let outerCount: Int = 10_000
-        let innerCount: Int = 20
+    private func whenSmallCount() {
+        sut = (10_000, 20)
+    }
+    
+    private func whenLargeCount() {
+        sut = (10, 20_000)
+    }
+    
+    private func performanceLoop(for kind: KindOfTestable) {
         var accumulator = 0
-        for _ in 1...outerCount {
-            let ringBuffer = CircularBuffer<Int>(capacity: innerCount)
-            for i in 1...innerCount {
-                ringBuffer.append(i)
-                accumulator ^= (ringBuffer.last ?? 0)
+        for _ in 1...sut.outerCount {
+            var testable = kind.newTestable(capacity: sut.innerCount)
+            for i in 1...sut.innerCount {
+                testable.enqueue(i)
+                accumulator ^= (testable.last ?? 0)
             }
-            for _ in 1...innerCount {
-                accumulator ^= (ringBuffer.first ?? 0)
-                ringBuffer.popFirst()
+            for _ in 1...sut.innerCount {
+                accumulator ^= (testable.first ?? 0)
+                testable.dequeue()
             }
         }
         XCTAssert(accumulator == 0)
     }
     
-    private func performanceLoopArray_smallCount() {
-        let outerCount: Int = 10_000
-        let innerCount: Int = 20
-        var accumulator = 0
-        for _ in 1...outerCount {
-            var array = Array<Int>()
-            array.reserveCapacity(innerCount)
-            for i in 1...innerCount {
-                array.append(i)
-                accumulator ^= (array.last ?? 0)
-            }
-            for _ in 1...innerCount {
-                accumulator ^= (array.first ?? 0)
-                array.remove(at: 0)
+    private enum KindOfTestable {
+        case circularBuffer
+        case array
+        
+        func newTestable(capacity: Int) -> PerformanceTestable {
+            switch self {
+            case .circularBuffer:
+                return CircularBuffer<Int>(capacity: capacity)
+            case .array:
+                return Array<Int>(capacity: capacity)
             }
         }
-        XCTAssert(accumulator == 0)
     }
     
-    private func performanceLoopCircularBuffer_largeCount() {
-        let outerCount: Int = 10
-        let innerCount: Int = 20_000
-        var accumulator = 0
-        for _ in 1...outerCount {
-            let ringBuffer = CircularBuffer<Int>(capacity: innerCount)
-            for i in 1...innerCount {
-                ringBuffer.append(i)
-                accumulator ^= (ringBuffer.last ?? 0)
-            }
-            for _ in 1...innerCount {
-                accumulator ^= (ringBuffer.first ?? 0)
-                ringBuffer.popFirst()
-            }
-        }
-        XCTAssert(accumulator == 0)
+}
+
+fileprivate protocol PerformanceTestable {
+    init(capacity: Int)
+    
+    var first: Int? { get }
+    
+    var last: Int? { get }
+    
+    mutating func enqueue(_ newElement: Int)
+    
+    @discardableResult
+    mutating func dequeue() -> Int?
+}
+
+extension CircularBuffer: PerformanceTestable where Element == Int{
+    convenience init(capacity: Int) {
+        self.init(capacity: capacity, usingSmartCapacityPolicy: true)
     }
     
-    private func performanceLoopArray_largeCount() {
-        let outerCount: Int = 10
-        let innerCount: Int = 20_000
-        var accumulator = 0
-        for _ in 1...outerCount {
-            var array = Array<Int>()
-            array.reserveCapacity(innerCount)
-            for i in 1...innerCount {
-                array.append(i)
-                accumulator ^= (array.last ?? 0)
-            }
-            for _ in 1...innerCount {
-                accumulator ^= (array.first ?? 0)
-                array.remove(at: 0)
-            }
-        }
-        XCTAssert(accumulator == 0)
+    func enqueue(_ newElement: Element) {
+        append(newElement)
+    }
+    
+    func dequeue() -> Element? {
+        popFirst()
+    }
+    
+}
+
+extension Array: PerformanceTestable where Element == Int {
+    init(capacity: Int) {
+        self.init()
+        reserveCapacity(capacity)
+    }
+    
+    mutating func enqueue(_ newElement: Element) {
+        append(newElement)
+    }
+    
+    mutating func dequeue() -> Element? {
+        isEmpty ? nil : removeFirst()
     }
     
 }
