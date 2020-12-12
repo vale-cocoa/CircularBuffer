@@ -99,31 +99,6 @@ extension CircularBuffer {
         if (isEmpty && capacity > candidateCapacity) || candidateCapacity <= capacity >> 2 {
             fastResizeElements(to: candidateCapacity)
         }
-        
-        /*
-        guard !isEmpty else {
-            let minCapacity = usingSmartCapacityPolicy ? Self.minSmartCapacity : 0
-            if capacity > minCapacity {
-                fastResizeElements(to: minCapacity)
-            }
-            
-            return
-        }
-        
-        guard
-            usingSmartCapacityPolicy
-        else {
-            if count < capacity { fastResizeElements(to: count) }
-            
-            return
-        }
-        
-        let candidateCapacity = Self.smartCapacityFor(count: count)
-        let actualSmartCapacity = Self.smartCapacityFor(count: capacity)
-        if actualSmartCapacity != capacity || candidateCapacity <= capacity >> 2 {
-            fastResizeElements(to: candidateCapacity)
-        }
-        */
     }
     
     // Shift the elements in the buffer so they won't wrap around the last buffer position,
